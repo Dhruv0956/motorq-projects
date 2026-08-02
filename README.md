@@ -2,7 +2,7 @@ This repository contains a collection of my software engineering, machine learni
 
 **Projects**
 
-**1. Edge-Optimized Weed Detection**
+## 1. Edge-Optimized Weed Detection
 A computer vision subsystem developed for a university autonomous rover using Ultralytics YOLO.
 
 **Technologies**
@@ -17,7 +17,7 @@ A computer vision subsystem developed for a university autonomous rover using Ul
 
 ---
 
-**2. Human Pose Recognition**
+## 2. Human Pose Recognition
 Human pose classification using MediaPipe Pose Landmarker and Scikit-learn, currently being extended into a multimodal activity recognition system using smartwatch sensor data.
 
 **Technologies**
@@ -31,7 +31,7 @@ Human pose classification using MediaPipe Pose Landmarker and Scikit-learn, curr
 
 ---
 
-**3. Multimodal Data Processing System**
+## 3. Multimodal Data Processing System
 A multimodal machine learning project integrating ECG signal analysis and facial image processing for heterogeneous biological data fusion. The system focuses on data preprocessing, feature extraction, and combining multiple data modalities to support downstream machine learning tasks. Awarded **3rd Place** at **Make-a-thon 2025**.
 
 **Technologies**
@@ -46,7 +46,7 @@ A multimodal machine learning project integrating ECG signal analysis and facial
 
 ---
 
-**4. Cleo AI Assistant**
+## 4. Cleo AI Assistant
 An AI-powered desktop assistant integrating conversational AI, speech recognition, desktop automation, and external APIs.
 
 **Technologies**
@@ -62,7 +62,7 @@ An AI-powered desktop assistant integrating conversational AI, speech recognitio
 
 ---
 
-**5. Exoplanet Transit Detection (Work in Progress)**
+## 5. Exoplanet Transit Detection (Work in Progress)
 An end-to-end exoplanet transit detection pipeline using NASA TESS light curve data.
 
 **Technologies**
