@@ -1,7 +1,5 @@
 This repository contains a collection of my software engineering, machine learning, computer vision, and scientific computing projects.
 
-**Projects**
-
 ## 1. Edge-Optimized Weed Detection
 A computer vision subsystem developed for a university autonomous rover using Ultralytics YOLO.
 
