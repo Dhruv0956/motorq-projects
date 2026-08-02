@@ -8,6 +8,23 @@ The complete machine learning workflow—from dataset preparation to deployment-
 
 ---
 
+## Results
+
+## Sample Predictions
+
+<p align="center">
+<img src="results/sample_prediction.png" width="700">
+</p>
+
+| Metric | Value |
+|---------|------:|
+| Precision | XX.X% |
+| Recall | XX.X% |
+| mAP@50 | XX.X% |
+| mAP@50-95 | XX.X% |
+
+---
+
 ## Features
 
 - End-to-end object detection pipeline
