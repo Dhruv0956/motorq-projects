@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+dataset/
+templates/
+test.jpg
+test.jpeg
+test.png
+watch_log.txt
+scanner.py

@@ -2,22 +2,24 @@
 
 ## Overview
 
-This project implements a machine learning pipeline for human pose recognition using MediaPipe Pose Landmarker and scikit-learn. The system extracts human skeletal landmarks from images, engineers geometric features such as joint angles and limb orientations, and classifies poses using a Multi-Layer Perceptron (MLP) classifier.
+This project implements a machine learning pipeline for human pose recognition using MediaPipe Pose Landmarker and scikit-learn. It extracts human skeletal landmarks from images, engineers geometric angle features, and classifies yoga poses using a Multi-Layer Perceptron classifier.
 
-The project is currently being extended into a multimodal human activity recognition system by integrating smartwatch sensor data (IMU) with vision-based pose features to improve recognition accuracy and robustness.
+The current trained model recognizes five poses:
 
----
+- Downdog
+- Goddess
+- Plank
+- Tree
+- Warrior2
 
 ## Features
 
 - Human pose landmark extraction using MediaPipe Pose Landmarker
-- Automatic dataset generation from pose images
+- Automatic dataset generation from pose image folders
 - Geometric feature engineering from skeletal landmarks
 - Pose classification using an MLP classifier
-- Automated preprocessing, training, and inference pipeline
-- Ongoing multimodal integration with smartwatch IMU data
-
----
+- Image-based inference
+- Live webcam-based pose recognition and visual feedback
 
 ## Technologies Used
 
@@ -27,73 +29,83 @@ The project is currently being extended into a multimodal human activity recogni
 - OpenCV
 - NumPy
 - Pandas
-- Matplotlib
+- Joblib
 
----
+## Setup
+
+Install the Python dependencies:
+
+```powershell
+pip install -r requirements.txt
+```
+
+## Train
+
+The dataset should be organized as one folder per pose:
+
+```text
+YogaPoses/
+  Downdog/
+  Goddess/
+  Plank/
+  Tree/
+  Warrior2/
+```
+
+Build the feature CSV:
+
+```powershell
+$env:PYTHONPATH = ".\src"
+python -c "from dataset_builder import DatasetBuilder; DatasetBuilder().build(r'C:\Users\Dhruv\Desktop\YogaPoses', 'data/features.csv')"
+```
+
+Train the classifier:
+
+```powershell
+python src\train.py
+```
+
+## Run Live
+
+Start webcam-based pose recognition:
+
+```powershell
+python src\live.py
+```
+
+Use a different camera index if needed:
+
+```powershell
+python src\live.py --camera 1
+```
+
+Press `q` to quit the video window.
+
+## Run On A Test Image
+
+Place a test image at `test.jpg`, then run:
+
+```powershell
+python src\main.py
+```
 
 ## Project Workflow
 
-```
-Input Images
-      │
-      ▼
+```text
+Input Images or Webcam Frames
+      |
+      v
 MediaPipe Pose Landmarker
-      │
-      ▼
-33 Pose Landmarks
-      │
-      ▼
-Feature Engineering
-      │
-      ▼
-Dataset Generation
-      │
-      ▼
-MLP Classifier Training
-      │
-      ▼
-Pose Prediction
+      |
+      v
+Pose Skeleton
+      |
+      v
+Angle Feature Extraction
+      |
+      v
+MLP Classifier
+      |
+      v
+Pose Prediction and Feedback Overlay
 ```
-
-### Current Extension
-
-```
-Camera Images               Smartwatch IMU
-       │                           │
-       ▼                           ▼
- Pose Landmarks            Sensor Processing
-       │                           │
-       └──────────────┬────────────┘
-                      ▼
-             Feature Fusion
-                      ▼
-      Human Activity Recognition
-```
-
----
-
-## Current Status
-
-✔ Pose landmark extraction completed
-
-✔ Feature engineering pipeline completed
-
-✔ Dataset generation completed
-
-✔ MLP classifier training completed
-
-✔ Automated inference pipeline completed
-
-🔄 Multimodal smartwatch integration in progress
-
----
-
-## Future Improvements
-
-- Real-time human activity recognition
-- Advanced multimodal feature fusion techniques
-- Deep learning-based sequence models
-- Edge deployment on embedded hardware
-- Support for additional activities and larger datasets
-
----
