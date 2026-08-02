@@ -20,10 +20,11 @@ Human pose classification using MediaPipe Pose Landmarker and Scikit-learn, curr
 
 **Technologies**
 - Python
-- MediaPipe
+- MediaPipe Pose Landmarker
 - Scikit-learn
 - OpenCV
 - NumPy
+- Pandas
 
 ➡️ [Open Project](./Human-Pose-Recognition)
 
@@ -34,12 +35,14 @@ An AI-powered desktop assistant integrating conversational AI, speech recognitio
 
 **Technologies**
 - Python
+- Streamlit
 - SpeechRecognition
 - pyttsx3
-- MySQL
 - Spotipy
 - OpenWeatherMap API
 - NewsAPI
+- MySQL
+- SQLite
 
 ➡️ [Open Project](./Cleo)
 
@@ -53,7 +56,9 @@ An end-to-end exoplanet transit detection pipeline using NASA TESS light curve d
 - Astropy
 - Lightkurve
 - NumPy
+- Pandas
 - Matplotlib
+- Google Colab
 
 ➡️ [Open Project](./Exoplanets)
 
