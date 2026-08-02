@@ -1,4 +1,4 @@
-Edge-Optimized Weed Detection System
+## Edge-Optimized Weed Detection System
 
 ## Overview
 
