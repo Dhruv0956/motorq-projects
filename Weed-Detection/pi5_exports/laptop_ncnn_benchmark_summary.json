@@ -1,0 +1,101 @@
+{
+  "date": "2026-07-25",
+  "machine": "laptop",
+  "mode": "images",
+  "conf": 0.35,
+  "max_images_per_split": 200,
+  "results": {
+    "ncnn640_cnw": {
+      "imgsz": 640,
+      "avg_ms": 230.19,
+      "median_ms": 226.17,
+      "p95_ms": 292.41,
+      "fps": 4.34,
+      "avg_boxes": 11.12,
+      "peak_rss_mb": 636.5,
+      "status": "fail"
+    },
+    "ncnn640_mh16": {
+      "imgsz": 640,
+      "avg_ms": 215.83,
+      "median_ms": 211.40,
+      "p95_ms": 250.96,
+      "fps": 4.63,
+      "avg_boxes": 5.04,
+      "peak_rss_mb": 635.5,
+      "status": "fail"
+    },
+    "ncnn416_cnw": {
+      "imgsz": 416,
+      "avg_ms": 78.86,
+      "median_ms": 77.31,
+      "p95_ms": 95.97,
+      "fps": 12.68,
+      "avg_boxes": 9.65,
+      "peak_rss_mb": 582.4,
+      "status": "pass"
+    },
+    "ncnn416_mh16": {
+      "imgsz": 416,
+      "avg_ms": 63.96,
+      "median_ms": 63.01,
+      "p95_ms": 76.69,
+      "fps": 15.63,
+      "avg_boxes": 4.86,
+      "peak_rss_mb": 581.5,
+      "status": "pass"
+    },
+    "ncnn320_cnw": {
+      "imgsz": 320,
+      "avg_ms": 75.13,
+      "median_ms": 81.09,
+      "p95_ms": 98.43,
+      "fps": 13.31,
+      "avg_boxes": 8.44,
+      "peak_rss_mb": 565.5,
+      "status": "pass"
+    },
+    "ncnn320_mh16": {
+      "imgsz": 320,
+      "avg_ms": 60.59,
+      "median_ms": 66.65,
+      "p95_ms": 84.73,
+      "fps": 16.50,
+      "avg_boxes": 4.54,
+      "peak_rss_mb": 564.5,
+      "status": "pass"
+    }
+  },
+  "camera_mode": {
+    "attempted": true,
+    "result": "failed",
+    "reason": "OpenCV could not open camera index 0 in this laptop session"
+  },
+  "recommendation": "Use 416 NCNN as the primary Raspberry Pi 5 candidate. 320 NCNN does not provide enough laptop speed gain to justify its accuracy loss unless the Pi benchmark shows 416 is too slow."
+  ,
+  "recall_first_conf_0_10": {
+    "ncnn416_cnw": {
+      "imgsz": 416,
+      "conf": 0.1,
+      "avg_ms": 109.43,
+      "median_ms": 104.65,
+      "p95_ms": 130.35,
+      "fps": 9.14,
+      "avg_boxes": 19.89,
+      "peak_rss_mb": 582.4,
+      "status": "pass"
+    },
+    "ncnn416_mh16": {
+      "imgsz": 416,
+      "conf": 0.1,
+      "avg_ms": 88.76,
+      "median_ms": 85.19,
+      "p95_ms": 107.36,
+      "fps": 11.27,
+      "avg_boxes": 15.21,
+      "peak_rss_mb": 581.3,
+      "status": "pass"
+    },
+    "recommendation": "Use conf 0.10 as the recall-first Stage 1 setting for deployment tests. It increases candidate boxes while staying above laptop speed target; Stage 2 or later filtering can handle extra candidates."
+  }
+}

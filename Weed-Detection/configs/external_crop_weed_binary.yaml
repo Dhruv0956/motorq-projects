@@ -1,0 +1,17 @@
+# Put an external YOLO-format crop/weed detection dataset here before pretraining.
+# Expected layout:
+# datasets/External_CropWeed_Binary/
+#   train/images
+#   train/labels
+#   val/images
+#   val/labels
+#
+# Labels can contain crop and weed classes; the pretraining script uses single_cls=True,
+# so all annotated plants are collapsed into one "plant_weed" detection target.
+path: E:\External_CropWeed_Binary
+train: train/images
+val: val/images
+
+names:
+  0: plant_weed
+

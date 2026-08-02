@@ -1,0 +1,133 @@
+Raspberry Pi 5 Stage 1 Weed Detection Deployment Checklist
+Date: 2026-07-25
+
+Goal
+----
+Run the Stage 1 one-class plant/weed detector locally on Raspberry Pi 5 8GB RAM.
+Target runtime: at least 5 to 6 FPS from camera feed.
+Target memory: below 5 GB RAM.
+
+Current Recommended Model Order
+-------------------------------
+1. Try 416 NCNN first.
+   - Best balance so far.
+   - Preserves MH16 dense-image accuracy fairly well.
+   - Accuracy loss exists on CNW/smaller-spaced objects, but it is much better than 320.
+
+2. Try 320 NCNN only if 416 is too slow.
+   - Faster.
+   - Larger accuracy drop, especially on CNW/small-object recall.
+
+Files To Copy To Raspberry Pi
+-----------------------------
+Copy these from the Windows workspace:
+
+1. Benchmark script:
+   C:/Users/Dhruv/Documents/ACE/scripts/benchmark_pi5_ncnn.py
+
+2. Primary model:
+   C:/Users/Dhruv/Documents/ACE/pi5_exports/stage1_plant_416_ncnn_model
+
+3. Fallback model:
+   C:/Users/Dhruv/Documents/ACE/pi5_exports/stage1_plant_320_ncnn_model
+
+Suggested Pi Folder Layout
+--------------------------
+Create a project folder on the Pi like:
+
+~/weed_detector_pi5/
+  benchmark_pi5_ncnn.py
+  stage1_plant_416_ncnn_model/
+  stage1_plant_320_ncnn_model/
+  test_images/
+
+Install Dependencies On Pi
+--------------------------
+Use a virtual environment if possible:
+
+python3 -m venv weed_env
+source weed_env/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install ultralytics psutil ncnn
+
+OpenCV note:
+- If pip OpenCV fails on Raspberry Pi, use system OpenCV instead:
+  sudo apt update
+  sudo apt install python3-opencv
+
+Benchmark Step 1 - Image Folder
+-------------------------------
+Run this first because it removes camera issues from the test:
+
+python3 benchmark_pi5_ncnn.py --model ./stage1_plant_416_ncnn_model --imgsz 416 --conf 0.10 --mode images --source ./test_images --max-images 200
+
+If 416 is too slow, run:
+
+python3 benchmark_pi5_ncnn.py --model ./stage1_plant_320_ncnn_model --imgsz 320 --conf 0.10 --mode images --source ./test_images --max-images 200
+
+Benchmark Step 2 - Camera Feed
+------------------------------
+Run camera benchmark after image-folder mode works:
+
+python3 benchmark_pi5_ncnn.py --model ./stage1_plant_416_ncnn_model --imgsz 416 --conf 0.10 --mode camera --camera 0 --frames 300
+
+If 416 is too slow, run:
+
+python3 benchmark_pi5_ncnn.py --model ./stage1_plant_320_ncnn_model --imgsz 320 --conf 0.10 --mode camera --camera 0 --frames 300
+
+Record These Results
+--------------------
+For each benchmark, record:
+
+- model used: 416 or 320
+- input size
+- image folder or camera mode
+- average latency in ms
+- median latency in ms
+- p95 latency in ms
+- FPS
+- average boxes per frame
+- peak RSS memory in MB
+- camera resolution, if using camera mode
+- any errors or warnings
+
+Decision Gate
+-------------
+Use 416 if:
+- FPS is 5 to 6 or higher,
+- peak memory is below 5 GB,
+- detections look visually acceptable on real farm/rover images.
+
+Use 320 only if:
+- 416 cannot reach the FPS target,
+- and 320 gives acceptable detection quality.
+
+Retrain or improve the model if:
+- 416 reaches the FPS/memory target but misses too many plants/weeds,
+- CNW-style spaced/small plants are missed often,
+- MH16-style dense scenes still miss crowded objects,
+- false positives are high on soil/background.
+
+Likely Next Training Improvements
+---------------------------------
+If 416 is fast enough but not accurate enough:
+
+1. Train a true 416-specific YOLO model instead of only exporting the 640-trained model at 416.
+2. Add stronger small-object handling for CNW-style images.
+3. Balance validation and sampling between dense MH16 and spaced CNW images.
+4. Tune confidence and NMS thresholds separately before assuming the model is bad.
+5. Add real rover camera frames as a final validation slice.
+
+Current Accuracy Reference
+--------------------------
+640 PyTorch baseline:
+- CNW: P 0.7728, R 0.6408, mAP50 0.7109, mAP50-95 0.4083
+- MH16: P 0.6940, R 0.5971, mAP50 0.6628, mAP50-95 0.2968
+
+416 NCNN:
+- CNW: P 0.7406, R 0.5335, mAP50 0.5913, mAP50-95 0.3180
+- MH16: P 0.6830, R 0.5811, mAP50 0.6390, mAP50-95 0.2758
+
+320 NCNN:
+- CNW: P 0.7134, R 0.4464, mAP50 0.4917, mAP50-95 0.2539
+- MH16: P 0.6475, R 0.5447, mAP50 0.5903, mAP50-95 0.2437

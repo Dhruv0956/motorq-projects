@@ -1,0 +1,120 @@
+External Pretrain -> MH-16 Fine-Tune -> MH-16 Validation
+========================================================
+
+Goal
+----
+Improve Stage 1 weed localization accuracy by learning generic crop/weed plant detection from an external dataset, then specializing the model only on MH-16 rover-style field images.
+
+
+Recommended External Datasets
+-----------------------------
+
+Option A: CropAndWeed Dataset
+- Larger and richer.
+- About 8k high-resolution images and about 112k annotated instances.
+- Has bounding boxes, masks, and stem positions.
+- Better long-term choice, but may require conversion into YOLO folder format.
+- Source: https://publications.ait.ac.at/de/datasets/cropandweed-dataset/
+- Tools: https://github.com/cropandweed/cropandweed-dataset
+
+Option B: Crop and Weed Detection Data with Bounding Boxes
+- Smaller, about 1300 images.
+- Images are 512x512.
+- YOLO and Pascal labels are available.
+- Easier first pretraining experiment.
+- Source: https://www.kaggle.com/datasets/ravirajsinh45/crop-and-weed-detection-data-with-bounding-boxes
+
+
+Expected Local External Dataset Layout
+--------------------------------------
+
+Put the selected external dataset here:
+
+datasets/External_CropWeed_Binary/
+  train/images
+  train/labels
+  val/images
+  val/labels
+
+The pretraining config is:
+
+configs/external_crop_weed_binary.yaml
+
+The pretraining script uses single_cls=True, so crop and weed labels are collapsed into one "plant_weed" detection target. This is intentional because Stage 1 currently needs strong plant/weed localization, not species identity.
+
+
+CropAndWeed Conversion
+----------------------
+
+If using CropAndWeed, first run its setup from inside the `cnw` directory or provide an explicit data root. The setup creates raw CSV annotations such as:
+
+C:/Users/Dhruv/Desktop/data/bboxes/CropOrWeed2
+
+It also needs the real image files under:
+
+C:/Users/Dhruv/Desktop/data/images
+
+If `data/images` is empty, do not start training yet. The annotations alone are not enough.
+
+After images are present, convert/link CropAndWeed into this repo's expected YOLO layout:
+
+python scripts/convert_cropandweed_to_yolo.py --source-root C:\Users\Dhruv\Desktop\data --bbox-variant CropOrWeed2 --output-root datasets/External_CropWeed_Binary --link-mode hardlink
+
+`hardlink` avoids duplicating the large image files when source and output are on the same drive.
+
+
+Training Steps
+--------------
+
+1. External pretrain:
+
+python scripts/train_stage1_external_pretrain.py
+
+Output:
+
+runs/detect/Stage1_External_Pretrain_yolov8n_768/weights/best.pt
+
+
+2. MH-16 fine-tune:
+
+python scripts/finetune_stage1_mh16_from_external.py
+
+Output:
+
+runs/detect/Stage1_MH16_Finetune_FromExternal_yolov8n_768/weights/best.pt
+
+
+3. MH-16-only validation:
+
+python scripts/validate_stage1_external_plan.py
+
+Output:
+
+runs/detect/Stage1_MH16_Finetune_FromExternal_safe_val/
+
+
+Comparison Baseline
+-------------------
+
+Compare the final model against the current Stage 1 baseline:
+
+runs/detect/runs/detect/Stage1_Field_Weed_SingleClass_yolov8n_640/weights/best.pt
+
+Current baseline best recorded metrics:
+- Precision: 0.70073
+- Recall: 0.63941
+- mAP50: 0.69839
+- mAP50-95: 0.30843
+
+The external pretrain workflow is only useful if MH-16 validation improves. Do not judge by external validation metrics.
+
+
+Success Target Before Stage 2
+-----------------------------
+
+Target before moving to species classifier integration:
+- Recall: 0.80+
+- mAP50: 0.80+
+- mAP50-95: 0.45+
+
+If the external pretrain + MH-16 fine-tune does not improve these numbers, the limiting factor is likely MH-16 label quality, image resolution, or model capacity.

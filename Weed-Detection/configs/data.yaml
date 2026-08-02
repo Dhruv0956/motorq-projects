@@ -1,0 +1,14 @@
+path: C:\Users\Dhruv\Documents\ACE\datasets\weeds1
+train: C:\Users\Dhruv\Documents\ACE\datasets\weeds1\train\images
+val: C:\Users\Dhruv\Documents\ACE\datasets\weeds1\valid\images
+test: C:\Users\Dhruv\Documents\ACE\datasets\weeds1\test\images
+
+nc: 1
+names: ['Weeds']
+
+roboflow:
+  workspace: augmented-startups
+  project: weeds-nxe1w
+  version: 3
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/augmented-startups/weeds-nxe1w/dataset/3

@@ -1,0 +1,1469 @@
+ACE Weed/Crop Edge AI Iteration Log
+===================================
+
+Purpose
+-------
+This file is the append-only chronological progress log for the local edge AI weed/crop detector.
+
+Rules for future updates:
+- Continue in this same txt file.
+- Append new entries below previous entries.
+- Do not overwrite or delete earlier entries.
+- Keep chronological progress and preserve context.
+- For every update/step include:
+  - What was done
+  - Why it was done
+  - Thought process and reasoning
+  - Problems encountered
+  - Fixes attempted
+  - Results and observations
+  - Next steps
+- Update future iterations based on past learnings and decisions.
+
+
+Iteration 001 - Project Scaffold For Local Edge Detection
+Date: 2026-05-17
+
+What was done:
+- Created an initial project scaffold for a local weed/crop object detector.
+- Added README.md with the target architecture and operating assumptions.
+- Added configs/weed_crop.yaml for YOLO-format dataset configuration.
+- Added requirements.txt with core dependencies.
+- Added scripts/train_export.py for training and exporting models.
+- Added scripts/detect_local.py for local camera/video/image inference throttled to 1 FPS.
+- Added .gitignore to keep datasets, runs, and model artifacts out of source tracking by default.
+
+Why it was done:
+- The workspace initially only contained Git metadata and no implementation files.
+- The requirement was to detect weeds and plants with bounding boxes locally on edge hardware, without a network call.
+- A minimal YOLO detector pipeline was the quickest practical path to a small, low-latency edge model.
+
+Thought process and reasoning:
+- Chose a nano YOLO-style detector as the baseline because it balances bounding-box accuracy, small model size, and edge deployment support.
+- Set the initial input size to 320 because the target requirement is only 1 FPS and the user prioritized minimum model size and RAM.
+- Kept the initial classes simple: weed and crop/plant.
+- Designed the workflow around training once, then exporting to a target-specific local runtime such as ONNX, NCNN, TFLite, OpenVINO, or TensorRT.
+
+Problems encountered:
+- There was no existing codebase to modify.
+- There was no dataset yet, so training could not be run during this iteration.
+
+Fixes attempted:
+- Created a complete starter pipeline instead of only writing a recommendation.
+- Added clear dataset folder expectations and commands for training/export.
+
+Results and observations:
+- The scaffold compiled successfully with py_compile.
+- The project now had a concrete path from labeled images to local edge inference.
+
+Next steps:
+- Install dependencies.
+- Add labeled weed/crop images in YOLO format.
+- Validate dataset labels before training.
+- Train the first nano detector.
+
+
+Iteration 002 - Dependency Verification And Benchmark Tooling
+Date: 2026-05-18
+
+What was done:
+- Verified that dependencies installed successfully after the user ran pip install -r requirements.txt.
+- Confirmed installed versions:
+  - ultralytics 8.4.33
+  - opencv-python 4.13.0
+  - onnxruntime 1.26.0
+- Added scripts/benchmark_local.py to measure FPS, latency, p95 latency, and RAM.
+- Added scripts/check_dataset.py to validate YOLO labels before training.
+- Updated README.md with dataset validation and benchmark instructions.
+- Added PyYAML to requirements.txt.
+
+Why it was done:
+- Edge deployment needs real measurement, not just model accuracy.
+- Label issues in object detection often create misleading training results, so a dataset checker was needed before training.
+- Since the system target is 1 FPS with low RAM, benchmarking had to become a first-class part of the project.
+
+Thought process and reasoning:
+- The benchmark tool was designed to work with synthetic frames, camera input, videos, or image folders.
+- Synthetic benchmarking gives a quick runtime sanity check, while real video/image benchmarking gives a more representative deployment signal.
+- The dataset checker verifies missing labels, malformed label rows, invalid class IDs, non-normalized coordinates, and invalid box dimensions.
+
+Problems encountered:
+- No labeled data was available yet, so only script validation could be done.
+
+Fixes attempted:
+- Confirmed scripts compile and dependency imports work.
+- Added validation tooling so the next training iteration would fail early if labels were malformed.
+
+Results and observations:
+- All scripts compiled successfully.
+- PyYAML was available in the environment.
+- The project became ready for dataset ingestion and first training.
+
+Next steps:
+- Add dataset under datasets/weeds/images and datasets/weeds/labels.
+- Run scripts/check_dataset.py.
+- Train with yolo11n.pt at imgsz 320.
+- Use benchmark_local.py after the first model is produced.
+
+
+Iteration 003 - First Training Run Analysis
+Date: 2026-05-19
+
+What was done:
+- Inspected the training output created by the user under runs/detect/runs/detect/weed_crop2.
+- Identified weed_crop2 as the complete useful run.
+- Reviewed args.yaml, results.csv, plots, weights, validation outputs, and class configuration.
+- Re-ran validation on best.pt to collect per-class metrics.
+- Counted dataset size and class distribution:
+  - Train images: 1040
+  - Validation images: 260
+  - Train boxes: 1703
+  - Validation boxes: 369
+  - Train crop boxes: 1004
+  - Train weed boxes: 699
+  - Validation crop boxes: 208
+  - Validation weed boxes: 161
+- Confirmed current class mapping:
+  - 0 = crop
+  - 1 = weed
+
+Why it was done:
+- The user had trained the model and requested analysis of results and next steps.
+- Accuracy, class balance, and edge performance needed to be evaluated before deciding whether to retrain or export.
+
+Thought process and reasoning:
+- Looked first for the completed run with results.csv and weights.
+- Compared best epoch and final epoch metrics to understand whether training was still improving or had plateaued.
+- Focused on mAP50 for detection presence and mAP50-95 for bounding-box quality.
+- Treated weed mAP50-95 as especially important because the main use case is weed localization.
+
+Problems encountered:
+- The runs path had nested folders: runs/detect/runs/detect/weed_crop2. This is unusual but usable.
+- An earlier weed_crop folder only contained args.yaml and did not represent a complete run.
+- Some shell attempts using Unix-style heredocs failed in PowerShell.
+- The yolo command was not available on PATH.
+
+Fixes attempted:
+- Used Python module calls through the installed ultralytics package instead of relying on yolo being on PATH.
+- Used PowerShell-compatible commands for counting dataset labels.
+- Focused analysis on weed_crop2 because it had complete metrics and weights.
+
+Results and observations:
+- Best epoch by mAP50-95 was epoch 73.
+- Best aggregate metrics:
+  - Precision: 0.86174
+  - Recall: 0.81873
+  - mAP50: 0.89607
+  - mAP50-95: 0.61438
+- Final epoch metrics were close to best:
+  - Precision: 0.88314
+  - Recall: 0.80687
+  - mAP50: 0.89577
+  - mAP50-95: 0.61062
+- PyTorch validation on best.pt:
+  - Overall: P 0.861, R 0.821, mAP50 0.896, mAP50-95 0.613
+  - Crop: P 0.829, R 0.822, mAP50 0.890, mAP50-95 0.652
+  - Weed: P 0.893, R 0.820, mAP50 0.902, mAP50-95 0.574
+- Training curves looked healthy. Losses continued downward and mAP plateaued near the end without an obvious overfitting spike.
+- Weed detection was good, but weed box tightness was weaker than crop box tightness.
+
+Next steps:
+- Treat best.pt as a good first deployable candidate.
+- Export to an edge runtime instead of shipping PyTorch for production.
+- Test on real camera/video frames from intended mounting height.
+- Improve weed box tightness with more small-weed, occlusion, and varied-field examples if field testing exposes loose boxes.
+
+
+Iteration 004 - Benchmarking And ONNX Export
+Date: 2026-05-19
+
+What was done:
+- Ran local synthetic benchmark on best.pt.
+- Fixed Windows RAM reporting in scripts/benchmark_local.py.
+- Installed ONNX export dependencies after approval:
+  - onnx
+  - onnxslim
+- Exported best.pt to ONNX:
+  - runs/detect/runs/detect/weed_crop2/weights/best.onnx
+- Validated the exported ONNX model.
+- Updated requirements.txt to include ONNX export dependencies.
+- Added MODEL_REPORT.md with the analyzed results and deployment recommendation.
+
+Why it was done:
+- The project target is local edge inference, so an export artifact is needed.
+- ONNX is a useful generic CPU deployment and validation format before moving to hardware-specific formats.
+- Benchmarking was needed to compare the model against the 1 FPS requirement.
+
+Thought process and reasoning:
+- First benchmarked the .pt model to establish a baseline.
+- Fixed RAM measurement before trusting memory numbers.
+- Exported ONNX because it is broadly portable and easy to validate locally with ONNX Runtime.
+- Compared ONNX validation metrics against PyTorch validation to ensure export did not damage model quality.
+
+Problems encountered:
+- Initial benchmark reported 0 MB RSS on Windows due to incorrect ctypes usage.
+- ONNX export failed because onnx and onnxslim were missing.
+- Ultralytics attempted to write settings/cache outside the workspace, requiring approval.
+- ONNX through the Ultralytics wrapper was slower than PyTorch on the development laptop.
+
+Fixes attempted:
+- Updated benchmark_local.py to use ctypes.WinDLL with explicit function signatures for Windows process memory.
+- Installed onnx and onnxslim with pip after approval.
+- Re-ran export with the required permission for Ultralytics settings/cache writes.
+- Validated ONNX after export instead of assuming parity.
+
+Results and observations:
+- PyTorch best.pt benchmark on synthetic frames:
+  - FPS: 13.60
+  - Average latency: 73.55 ms
+  - p95 latency: 87.72 ms
+  - Working set: about 551 MB
+- ONNX best.onnx benchmark on synthetic frames:
+  - FPS: 4.90
+  - Average latency: 203.89 ms
+  - p95 latency: 285.21 ms
+  - Working set: about 579 MB
+- Both PyTorch and ONNX exceeded the 1 FPS target on the development machine.
+- ONNX model size was about 10.0 MB.
+- PyTorch model size was about 5.2 MB.
+- ONNX validation:
+  - Overall: P 0.869, R 0.803, mAP50 0.884, mAP50-95 0.632
+  - Crop: P 0.829, R 0.791, mAP50 0.870, mAP50-95 0.672
+  - Weed: P 0.910, R 0.815, mAP50 0.898, mAP50-95 0.592
+- ONNX preserved quality well. Recall dipped slightly but mAP50-95 improved slightly.
+
+Next steps:
+- Benchmark on the real edge device, because Windows + Python + Ultralytics wrapper memory is not representative of native edge runtime memory.
+- Choose final export format based on hardware:
+  - Intel edge CPU/NPU: OpenVINO
+  - Raspberry Pi / ARM Linux: NCNN or TFLite INT8
+  - NVIDIA Jetson: TensorRT engine
+  - Generic CPU prototype: ONNX
+- Use real camera/video frames from deployment height to check practical false positives, missed weeds, and box tightness.
+
+
+Iteration 005 - Append-Only Documentation Process
+Date: 2026-05-21
+
+What was done:
+- Created ITERATION_LOG.txt as the persistent project iteration log.
+- Seeded the log with chronological entries covering the work already completed:
+  - Initial scaffold
+  - Dependency verification and tooling
+  - First training analysis
+  - Benchmarking and ONNX export
+- Added a rule section at the top to preserve the logging format requested by the user.
+
+Why it was done:
+- The user requested every iteration to be documented from the bottom up with consistent fields.
+- The log must continue in the same txt file without overwriting previous entries.
+- Past context should inform future decisions, especially around model quality, deployment format, and edge benchmarking.
+
+Thought process and reasoning:
+- Chose a simple txt file rather than markdown because the user explicitly requested a txt file.
+- Used chronological iteration entries to preserve context and make future updates easy to append.
+- Included previous problems and fixes because they affect future choices, especially PowerShell command style, ONNX dependencies, and RAM measurement.
+
+Problems encountered:
+- There was no existing log file, so previous work had to be reconstructed from repository state and conversation context.
+
+Fixes attempted:
+- Created the log with all known historical iterations rather than starting only from the current request.
+- Kept entries concise but complete under the requested headings.
+
+Results and observations:
+- The project now has a persistent append-only documentation file.
+- Future model training, export, benchmarking, and deployment steps can continue in this same file.
+
+Next steps:
+- Append a new iteration after each meaningful project update.
+- Do not overwrite ITERATION_LOG.txt.
+- Use prior observations to guide future actions, especially:
+  - Weed box tightness needs field validation.
+  - Edge runtime should match hardware.
+  - Benchmark on target device before declaring production readiness.
+
+
+Iteration 006 - Context Audit And Two-Stage Rover Plan
+Date: 2026-05-24
+
+What was done:
+- Inspected the current workspace after multiple trial-and-error experiments.
+- Reviewed configs, scripts, datasets, run folders, result CSVs, weights, and label distributions.
+- Identified the main experiment tracks:
+  - older crop/weed detector using datasets/weeds
+  - Roboflow single-class weed detector using datasets/weeds1
+  - Top5 species YOLO-format dataset using full-frame boxes
+  - MH-16 field dataset linked through Field_Binary_Dataset
+- Created EXPERIMENT_MAP_AND_PLAN.txt to consolidate the current context and next plan.
+
+Why it was done:
+- The project direction had expanded from crop/weed detection to rover-camera weed species identification on Jetson Nano.
+- The user wanted a plan before more actions because the trial history had become hard to reason about.
+- A clean map was needed before deciding what to train next.
+
+Thought process and reasoning:
+- Started from the bottom of the stack: datasets and labels, then configs, then scripts, then runs and metrics.
+- Treated dataset truth as more important than run names because several folder names were misleading.
+- Interpreted Top5_Weeds_Dataset as classifier-like because every label is a full-frame box.
+- Interpreted Field_Binary_Dataset as the likely most important rover-domain dataset because it uses field images and real boxes.
+- Kept the two-stage plan because detection and species classification are different tasks.
+
+Problems encountered:
+- Field_Binary_Dataset appears to contain symlinked files, so image and label file sizes appear as 0 even though targets exist.
+- The folder name Field_Binary_Dataset is misleading because the config lists 16 species.
+- The config lists class 15 Punarnava, but class 15 was not observed in the field label counts.
+- Current Top5_Weeds_Dataset species do not match the most frequent species in field annotations.
+- train13 was resumed with val=False, so its results.csv has zero metrics in later rows and cannot be judged from training CSV alone.
+
+Fixes attempted:
+- Counted field label class distributions directly from the linked label files.
+- Compared Top5 species counts against field annotation counts.
+- Mapped major runs to their configs and intended purpose.
+- Avoided training, validation, export, or dataset mutation during this planning step.
+
+Results and observations:
+- Top5_Weeds_Dataset is intact and has 3864 train images and 968 validation images.
+- Top5 labels are full-frame boxes, making train8 closer to classification than true detection.
+- Field_Binary_Dataset has 5324 train label files, 1332 val label files, and more than 62000 total boxes.
+- Field annotation top five by total count are:
+  - Lavhala
+  - Lamber_Quarter
+  - Kena
+  - Obscure_morning_glory
+  - Little_Mallow
+- Current hand-picked Top5 includes Bilayat, Gajar_Gavat, Harali, and Punarnava, which are rare or absent in field counts.
+- train8 has extremely high metrics, but those metrics are inflated by full-frame labels.
+- weed_crop5 is a strong single-class weed detector on the Roboflow weed dataset.
+- train13 is a potential Stage 1 field detector but needs separate safe validation.
+
+Next steps:
+- Do not train a new model immediately.
+- First validate train13 best.pt safely with low batch and workers=0.
+- Decide whether the target five species should be field-frequency top five or agronomic-priority top five.
+- Build a Stage 2 classifier dataset from field box crops for the selected five species.
+- Keep Stage 1 detector and Stage 2 classifier separate until both are individually reliable.
+
+
+Iteration 007 - Stage 1 Field Detector Validation
+Date: 2026-05-24
+
+What was done:
+- The Stage 1 field detector was validated using scripts/validate_stage1.py.
+- The model loaded was runs/detect/train13/weights/best.pt.
+- Validation used configs/dataset_stage1.yaml on Field_Binary_Dataset validation images.
+- Validation was run safely with low batch settings from the script.
+
+Why it was done:
+- train13 had been resumed with val=False, so its training results.csv could not be trusted for model quality.
+- A standalone validation pass was needed before deciding whether train13 could be used as the Stage 1 rover weed detector.
+- Stage 1 quality matters because the classifier can only identify species on weeds that the detector successfully finds.
+
+Thought process and reasoning:
+- Stage 1 should prioritize recall and box quality on rover/field frames.
+- A weak detector will cause the whole two-stage pipeline to fail, even if the species classifier is strong.
+- mAP50 shows whether weeds are broadly found, while mAP50-95 shows whether boxes are tight and consistent.
+- For a downstream classifier, loose boxes may still be usable if the crop contains the weed, but missed detections are more damaging.
+
+Problems encountered:
+- The validation metrics are much lower than the earlier clean Top5 and Roboflow experiments.
+- This confirms that field-camera weed detection is substantially harder than individual-species/full-frame classification.
+- Current Stage 1 detector is not strong enough to be treated as production-ready.
+
+Fixes attempted:
+- No fixes were attempted in this iteration.
+- This was a measurement-only step.
+
+Results and observations:
+- Validation dataset:
+  - 1332 images
+  - 12662 instances
+  - 0 corrupt images
+- Stage 1 validation metrics:
+  - Precision: 0.642
+  - Recall: 0.518
+  - mAP50: 0.5909
+  - mAP50-95: 0.2474
+- Runtime on RTX 3050 laptop GPU:
+  - preprocess: 0.4 ms/image
+  - inference: 7.0 ms/image
+  - postprocess: 1.1 ms/image
+- The detector is finding some weeds but missing too many and producing weak box quality.
+- This is below the quality needed for a high-accuracy rover pipeline.
+
+Next steps:
+- Do not use train13 as the final Stage 1 detector.
+- Inspect val8 prediction images to identify failure patterns:
+  - missed small weeds
+  - loose boxes
+  - dense-overlap confusion
+  - species/classes being collapsed poorly under single_cls=True
+  - annotation quality issues
+- Run a clean Stage 1 retraining plan rather than continuing ad-hoc resumes.
+- Consider whether Stage 1 should remain single-class weed detection or use a reduced top-5 field-species detector.
+- Build the Stage 2 classifier dataset from field crops, but do not rely on train13 detections for crop generation; use ground-truth boxes first.
+
+
+Iteration 008 - Clean Stage 1 Retraining Progress Check
+Date: 2026-05-24
+
+What was done:
+- Reviewed live training progress from the clean Stage 1 single-class field weed detector run.
+- The run is at epochs 81-83 of 100.
+- Training is using 640 image size and a YOLO nano detector on the field dataset with all species collapsed into one weed class.
+
+Why it was done:
+- The previous Stage 1 detector, train13, validated poorly with mAP50 0.5909 and mAP50-95 0.2474.
+- The clean retrain was started to improve field weed localization before building the detector + classifier pipeline.
+- Mid-training metrics help decide whether to let training continue or stop early.
+
+Thought process and reasoning:
+- Compared the current validation metrics against train13 rather than against the easier Top5/full-frame dataset.
+- Prioritized recall and mAP50 because Stage 1 must find weeds before Stage 2 can classify them.
+- Watched mAP50-95 to judge box quality, which matters for producing useful crops for the classifier.
+- Also checked GPU memory stability because earlier training attempts had memory and validation issues.
+
+Problems encountered:
+- No new error was reported.
+- mAP50-95 is improving but still modest, so box tightness remains the main weakness.
+- Metrics appear to be plateauing around epochs 81-82, but not enough information is available yet to stop the run early.
+
+Fixes attempted:
+- No fix was attempted during this progress check.
+- Recommendation is to let the current run finish unless CUDA or validation errors appear.
+
+Results and observations:
+- Epoch 81:
+  - box_loss: 1.680
+  - cls_loss: 1.170
+  - dfl_loss: 1.394
+  - precision: 0.696
+  - recall: 0.637
+  - mAP50: 0.693
+  - mAP50-95: 0.306
+- Epoch 82:
+  - box_loss: 1.675
+  - cls_loss: 1.161
+  - dfl_loss: 1.396
+  - precision: 0.701
+  - recall: 0.634
+  - mAP50: 0.693
+  - mAP50-95: 0.308
+- This is a clear improvement over train13:
+  - mAP50 improved from 0.5909 to about 0.693.
+  - mAP50-95 improved from 0.2474 to about 0.308.
+  - recall improved from 0.518 to about 0.634-0.637.
+- GPU memory appears stable around 3.56 GB to 3.92 GB.
+- Training speed is about 3.9 iterations/second, with validation around 8.1 seconds per epoch.
+
+Next steps:
+- Let the run finish to epoch 100 unless it crashes or metrics sharply degrade.
+- After completion, identify the best epoch from results.csv, not only the final epoch.
+- Run a final safe validation with plots enabled on the best.pt checkpoint.
+- Inspect prediction images for common miss patterns before deciding on another retraining change.
+- If another Stage 1 run is needed, focus on improving small-object recall and box tightness rather than changing the overall two-stage architecture.
+
+
+Iteration 009 - Clean Stage 1 Training Validation Crash At Epoch 91
+Date: 2026-05-24
+
+What was done:
+- Reviewed a crash from the clean Stage 1 training run.
+- The run crashed at epoch 91/100 during validation after completing the training loop for that epoch.
+- Inspected the run folder:
+  - runs/detect/runs/detect/Stage1_Field_Weed_SingleClass_yolov8n_640
+- Confirmed that both best.pt and last.pt exist.
+- Checked results.csv and found that metrics are recorded through epoch 90.
+
+Why it was done:
+- The user needed to know whether to resume training, restart, or use the saved checkpoint.
+- The traceback showed a NumPy ArrayMemoryError inside Ultralytics validation metric calculation, not a model training failure.
+
+Thought process and reasoning:
+- Because the crash happened during validation metric calculation, the model training itself was not the main problem.
+- The validation stats array became too large: shape (262515, 10), int64, about 20 MB.
+- This usually means validation produced many candidate detections across the dataset, and AP calculation needed a large intermediate array.
+- Since results had plateaued from epochs 83-90, finishing the last 10 epochs may not change much.
+- The best.pt checkpoint is the most important artifact, not reaching epoch 100 for its own sake.
+
+Problems encountered:
+- Training crashed at validation instead of finishing all 100 epochs.
+- results.csv only includes metrics through epoch 90.
+- Epochs 84-90 show a plateau around:
+  - mAP50: about 0.694 to 0.698
+  - mAP50-95: about 0.307 to 0.308
+  - recall: about 0.634 to 0.640
+- Stage 1 remains improved over train13 but still not high-accuracy.
+
+Fixes attempted:
+- No training fix was applied yet.
+- The run artifacts were inspected to confirm checkpoint availability.
+
+Results and observations:
+- best.pt exists:
+  - runs/detect/runs/detect/Stage1_Field_Weed_SingleClass_yolov8n_640/weights/best.pt
+- last.pt exists:
+  - runs/detect/runs/detect/Stage1_Field_Weed_SingleClass_yolov8n_640/weights/last.pt
+- Last recorded epoch in results.csv is epoch 90.
+- Best visible validation region is around epoch 84-90:
+  - epoch 84 mAP50: 0.69839
+  - epoch 84 mAP50-95: 0.30843
+  - epoch 90 mAP50: 0.69671
+  - epoch 90 mAP50-95: 0.30808
+- The clean run improved significantly over train13 but appears to have plateaued.
+
+Next steps:
+- Do not restart training from scratch.
+- Treat best.pt as the current Stage 1 candidate.
+- Run a safe validation-only pass on best.pt with lower max_det and workers=0 to avoid the AP memory crash.
+- If validation succeeds, inspect prediction images and decide whether another training strategy is needed.
+- Only resume training with val=False if there is a strong reason to squeeze the last 9 epochs; current evidence suggests this is not necessary.
+
+
+Iteration 010 - Direct Review Of Clean Stage 1 Results
+Date: 2026-05-24
+
+What was done:
+- Reviewed the clean Stage 1 run results directly from the run folder.
+- Inspected results.csv, checkpoint files, safe validation plots, confusion matrix, and sample label/prediction images.
+- Compared recorded training metrics and visual validation outputs.
+
+Why it was done:
+- The user asked for the results to be reviewed directly rather than relying only on console output.
+- The training run crashed during validation at epoch 91, so the saved artifacts needed to be interpreted carefully.
+
+Thought process and reasoning:
+- Used the CSV through epoch 90 as the stable metric source.
+- Used the safe validation folder for visual inspection because it generated prediction images and plots without crashing.
+- Focused on whether the detector is good enough for Stage 1 in a detector-plus-classifier pipeline.
+- Treated recall and practical crop usefulness as more important than perfect box tightness, but mAP50-95 remains a concern.
+
+Problems encountered:
+- The clean training folder contains only args.yaml, results.csv, and weights because plots were disabled during training.
+- The safe validation folder has plots and sample predictions but does not include a results.csv.
+- Metrics plateaued before the crash, so there is no evidence that the final 9 epochs would have materially improved the detector.
+
+Fixes attempted:
+- Computed the best recorded epoch manually from results.csv.
+- Reviewed safe validation images side-by-side with label images.
+
+Results and observations:
+- Best recorded epoch by mAP50 and mAP50-95:
+  - epoch: 84
+  - precision: 0.70073
+  - recall: 0.63941
+  - mAP50: 0.69839
+  - mAP50-95: 0.30843
+- Best recorded recall:
+  - epoch: 86
+  - precision: 0.69642
+  - recall: 0.63996
+  - mAP50: 0.69532
+  - mAP50-95: 0.30783
+- Last recorded epoch:
+  - epoch: 90
+  - precision: 0.70362
+  - recall: 0.63716
+  - mAP50: 0.69671
+  - mAP50-95: 0.30808
+- Safe validation PR curve shows about 0.697 mAP@0.5.
+- Confusion matrix suggests about 69% of true weed items are detected, with about 31% missed as background.
+- Visual inspection:
+  - The model finds many obvious weed/plant regions.
+  - It finds several small plants with moderate confidence.
+  - It misses some small/edge/overlapping weeds.
+  - It sometimes duplicates nearby detections or places loose boxes around thin grass-like weeds.
+  - The detector is visibly much better than train13 but still not high-accuracy enough for final production.
+
+Next steps:
+- Keep this best.pt as the current Stage 1 baseline candidate.
+- Do not resume just to finish epoch 100.
+- Move to error analysis and dataset strategy rather than more blind training.
+- Build Stage 2 classifier crops from ground-truth boxes.
+- For the next Stage 1 improvement, consider:
+  - imgsz 768 or 960 if Jetson budget allows after export testing
+  - YOLOv8s/YOLO11s for accuracy testing, then optimize if needed
+  - reducing duplicate/loose boxes through label cleanup and threshold tuning
+  - class-aware or top-5 detector experiments only after single-class baseline is understood
+
+
+Iteration 011 - Public Dataset Scout For Better Stage 1 Data
+Date: 2026-05-24
+
+What was done:
+- Looked for public crop/weed detection datasets that could improve Stage 1 field weed detection.
+- Focused on datasets with bounding boxes, real field imagery, and crop/weed relevance.
+
+Why it was done:
+- Current Stage 1 detector is improved but still not high-accuracy enough.
+- Better or complementary data may improve recall and box quality, especially for small weeds.
+
+Thought process and reasoning:
+- Prioritized datasets with object detection annotations over classification-only datasets.
+- Treated domain match as the key issue: a dataset is only better if its crop type, camera angle, plant scale, field conditions, and annotation style are close to the rover target.
+- Considered classification datasets useful for Stage 2, but not sufficient for Stage 1 detector improvement.
+
+Problems encountered:
+- Many weed datasets are classification-only or segmentation-focused, not YOLO-style bounding-box detection.
+- Public datasets often target different crops, countries, camera heights, UAV views, or weed species.
+- Adding mismatched data can improve generic robustness but may hurt rover-specific accuracy if mixed carelessly.
+
+Fixes attempted:
+- Grouped candidate datasets by practical use:
+  - Stage 1 detection augmentation
+  - Stage 2 species classification
+  - possible future segmentation/reference data
+
+Results and observations:
+- Strong Stage 1 detection candidates:
+  - CropAndWeed dataset: about 8k high-resolution images and about 112k annotated plant instances, with bounding boxes, masks, and stem positions for 74 crop/weed species.
+  - Crop and Weed Detection Data with Bounding Boxes: 1300 YOLO-format 512x512 field images for sesame crop and weeds.
+  - WeedCrop dataset mentioned in recent literature: 2822 RGB images with YOLO-format bounding boxes.
+  - Newer cotton-field weed/crop YOLO datasets exist, but crop/camera domain may differ.
+- Stage 2 classification candidates:
+  - DeepWeeds: 17509 images, 8 weed species plus negative/off-target plant life.
+  - Agro_Dataset_344k: large aggregated classification-style dataset made from many public weed/plant datasets.
+- Best immediate external dataset to investigate for Stage 1 is CropAndWeed, followed by the 1300-image crop/weed bounding-box dataset.
+
+Next steps:
+- Do not blindly mix external datasets into MH-16 training.
+- First inspect external dataset samples and labels for camera angle, object scale, and class definitions.
+- If using external data, pretrain Stage 1 on external detection data, then fine-tune on MH-16 only.
+- Keep final validation on MH-16 rover-style field images to avoid misleading cross-domain gains.
+
+
+Iteration 012 - External Pretrain Workflow Setup
+Date: 2026-05-24
+
+What was done:
+- Accepted the external pretrain -> MH-16 fine-tune -> MH-16-only validation strategy as the next Stage 1 accuracy plan.
+- Added configs/external_crop_weed_binary.yaml as a placeholder config for an external YOLO-format crop/weed dataset.
+- Added scripts/train_stage1_external_pretrain.py.
+- Added scripts/finetune_stage1_mh16_from_external.py.
+- Added scripts/validate_stage1_external_plan.py.
+- Added EXTERNAL_PRETRAIN_WORKFLOW.txt documenting the workflow and dataset expectations.
+
+Why it was done:
+- Current Stage 1 baseline is useful but not high-accuracy enough.
+- External detection data may help the model learn generic plant/weed localization before specializing on MH-16 rover frames.
+- The workflow needs to be reproducible and comparable against the current baseline.
+
+Thought process and reasoning:
+- Kept Stage 1 as single-class detection because localization quality is the bottleneck.
+- Used external data only for pretraining and MH-16 only for fine-tuning and final validation.
+- Chose imgsz 768 for the new workflow to improve small weed recall relative to the 640 baseline.
+- Kept max_det=50 to reduce validation memory issues.
+- Created separate scripts rather than modifying existing training scripts, preserving experiment traceability.
+
+Problems encountered:
+- External datasets are not yet present locally.
+- CropAndWeed may need conversion into YOLO train/val folders.
+- Kaggle/Innovatiana crop-weed data is easier to use but smaller and domain-specific to sesame.
+
+Fixes attempted:
+- Defined a simple expected local folder layout:
+  - datasets/External_CropWeed_Binary/train/images
+  - datasets/External_CropWeed_Binary/train/labels
+  - datasets/External_CropWeed_Binary/val/images
+  - datasets/External_CropWeed_Binary/val/labels
+- Added scripts that will run once the dataset is placed in that format.
+
+Results and observations:
+- The repo now has a clear external-pretrain pipeline.
+- The current comparison baseline remains:
+  - precision: 0.70073
+  - recall: 0.63941
+  - mAP50: 0.69839
+  - mAP50-95: 0.30843
+- The next model should only be considered better if it improves on MH-16 validation.
+
+Next steps:
+- Download or place an external crop/weed YOLO-format dataset into datasets/External_CropWeed_Binary.
+- Prefer the smaller Kaggle/Innovatiana YOLO dataset for the first fast test, or CropAndWeed for the stronger long-term pretrain.
+- Run scripts/train_stage1_external_pretrain.py.
+- Run scripts/finetune_stage1_mh16_from_external.py.
+- Run scripts/validate_stage1_external_plan.py and compare against the baseline.
+
+
+Iteration 013 - CropAndWeed Setup Inspection And Converter
+Date: 2026-05-25
+
+What was done:
+- Reviewed the user's CropAndWeed setup output.
+- Inspected the generated folders under C:/Users/Dhruv/Desktop/data.
+- Confirmed that bounding-box mappings were generated, including CropOrWeed2.
+- Added scripts/convert_cropandweed_to_yolo.py to convert CropAndWeed CSV bounding boxes into YOLO labels.
+- Updated EXTERNAL_PRETRAIN_WORKFLOW.txt with CropAndWeed conversion instructions.
+- Added Pillow to requirements.txt because the converter reads image dimensions.
+
+Why it was done:
+- CropAndWeed setup crashed at the final step with FileNotFoundError for ../images.
+- The external pretrain workflow needs a YOLO-format dataset under datasets/External_CropWeed_Binary.
+- The generated CropAndWeed annotations are CSV files, not YOLO txt files.
+
+Thought process and reasoning:
+- The setup crash happened after many mapping steps completed, so the annotation work should not be thrown away.
+- The traceback's ../images error is caused by the setup script using a relative path based on the current PowerShell working directory.
+- For Stage 1 pretraining, the CropOrWeed2 variant is the most relevant starting point because it is crop-or-weed style detection.
+- The converter uses hardlinks by default to avoid duplicating large images on disk.
+
+Problems encountered:
+- C:/Users/Dhruv/Desktop/data/bboxes/CropOrWeed2 exists and contains 7705 CSV annotation files.
+- C:/Users/Dhruv/Desktop/data/images appears empty.
+- Without the real CropAndWeed images, conversion/training cannot proceed.
+- The machine has limited free disk space, so copying full images would be risky.
+
+Fixes attempted:
+- Added a converter that will fail clearly if images are missing.
+- The converter supports hardlink, symlink, or copy modes.
+- The workflow now explicitly says not to train if C:/Users/Dhruv/Desktop/data/images is empty.
+
+Results and observations:
+- CropAndWeed annotations are available.
+- CropAndWeed images are not currently available in the expected data/images folder.
+- The external pretraining pipeline is ready once images are present.
+
+Next steps:
+- Resolve the missing CropAndWeed image extraction before training.
+- Prefer rerunning CropAndWeed setup with an explicit data_root on a drive with enough free space.
+- After images exist, run:
+  python scripts/convert_cropandweed_to_yolo.py --source-root C:\Users\Dhruv\Desktop\data --bbox-variant CropOrWeed2 --output-root datasets/External_CropWeed_Binary --link-mode hardlink
+- Then run external pretrain, MH-16 fine-tune, and MH-16 validation.
+
+
+Iteration 014 - E Drive YOLO-NAS Pipeline And Evaluation Audit
+Date: 2026-06-04
+
+What was done:
+- Inspected E:/cropandweed-dataset-main/dataset_yolo_nas/pipeline.py.
+- Inspected E:/cropandweed-dataset-main/dataset_yolo_nas/evaluation.py.
+- Inspected E:/cropandweed-dataset-main/dataset_yolo_nas/train_yolo_nas.py.
+- Inspected E:/cropandweed-dataset-main/split_and_convert.py.
+- Reviewed YOLO-NAS checkpoint logs under E:/cropandweed-dataset-main/checkpoints/crop_weed_yolo_nas/RUN_20260530_212424_265580.
+- Reviewed the saved evaluation result in E:/cropandweed-dataset-main/eval_results/results_20260603_173305.json.
+- Opened one saved prediction visualization from E:/cropandweed-dataset-main/predictions.
+
+Why it was done:
+- The user reported that the classifier reached near 98 percent accuracy but the current evaluation results are very poor.
+- The goal was to determine whether the poor result comes from the detector, classifier, domain mismatch, or evaluation/pipeline logic.
+
+Thought process and reasoning:
+- The YOLO-NAS model is a binary detector trained with classes crop=0 and weed=1 from the CropOrWeed2 mapped dataset.
+- The EfficientNet-B3 classifier is a five-class weed species classifier.
+- In a two-stage detector-plus-classifier pipeline, only weed detections should be sent into the weed species classifier.
+- If crop detections or low-confidence duplicate boxes are passed into the classifier, the classifier must assign them to one of the five weed species, causing many false positives.
+- End-to-end metrics should be decomposed into detector localization metrics, classifier-on-ground-truth-crops metrics, classifier-on-detected-crops metrics, and final pipeline metrics.
+
+Problems encountered:
+- pipeline.py sets YOLO_CONF_THRESH=0.0 and CLS_CONF_THRESH=0.0.
+- pipeline.py extracts pred.bboxes_xyxy and sets yolo_conf=1.0 whenever boxes contain only four coordinates, so the threshold can be bypassed.
+- evaluation.py uses the same bboxes_xyxy pattern and also sets conf=1.0 for four-value boxes.
+- evaluation.py does not filter YOLO class labels, so crop boxes can be evaluated as weed species predictions.
+- evaluation.py evaluates only os.listdir(IMG_DIR)[:100], which is unsorted and may not be representative.
+- The checkpoint log shows YOLO-NAS validation only through epoch 24 of a 50 epoch setup, suggesting the run may not be a clean completed training run.
+- The saved prediction image contains many large overlapping low-confidence weed boxes, explaining the high false-positive count.
+
+Fixes attempted:
+- No source-code edits were made during this audit.
+- Verified from split_and_convert.py and sample YOLO labels that CropOrWeed2 was converted as a binary crop/weed dataset.
+- Verified from train_yolo_nas.py that the detector was trained with classes ["crop", "weed"] and watched mAP@0.50.
+- Verified from logs that the detector reached about Valid_mAP@0.50=0.5353, precision=0.6280, recall=0.6140 at epoch 24 on the CropAndWeed-style validation split.
+
+Results and observations:
+- The current end-to-end evaluation result was TP=16, FP=317, FN=274, precision=0.0480, recall=0.0552, F1=0.0514 over 100 images.
+- This result should not be interpreted as "the classifier failed"; it is heavily affected by detector false positives, no crop/weed class filtering, likely wrong confidence extraction, and domain mismatch.
+- The classifier's near 98 percent crop accuracy can still be real, but it was probably measured on clean ground-truth species crops rather than detector-generated rover crops.
+- The detector is currently external CropAndWeed style and should be fine-tuned or retrained on MH-16 rover-style labels before judging final performance.
+
+Next steps:
+- Fix prediction parsing so boxes, confidence scores, and detector class labels are read separately from the SuperGradients prediction object.
+- Filter detections to YOLO class 1 only before species classification.
+- Raise YOLO confidence from 0.0/0.3 to an empirically tested range, starting with 0.45 to 0.60.
+- Add NMS or use the model post-processing correctly to reduce duplicate giant boxes.
+- Sort and evaluate the full MH-16 validation set, or use a fixed seeded subset.
+- Report separate detector-only recall/precision and final detector-plus-classifier metrics.
+- Fine-tune the binary detector on MH-16 rover images before relying on it for the final pipeline.
+
+
+Iteration 015 - Fixed MH-16 Evaluation And Pipeline Filtering
+Date: 2026-06-04
+
+What was done:
+- Rewrote E:/cropandweed-dataset-main/dataset_yolo_nas/evaluation.py.
+- Rewrote E:/cropandweed-dataset-main/dataset_yolo_nas/pipeline.py.
+- Added robust SuperGradients prediction parsing for boxes, confidence scores, and detector class labels.
+- Added filtering so only YOLO class 1, meaning weed, is passed into the five-species classifier.
+- Added deterministic sorted image evaluation.
+- Added simple IoU NMS after filtering.
+- Added separate detector-only target weed metrics and final detector-plus-classifier species metrics.
+- Added visual overlay saving under E:/cropandweed-dataset-main/eval_results/visuals.
+- Ran syntax checks on both updated scripts.
+- Ran fixed MH-16 evaluation on 10 images and then 100 images.
+- Ran a lower YOLO confidence comparison at 0.25.
+- Ran the filtered single-image pipeline and confirmed it saved E:/cropandweed-dataset-main/predictions/pipeline_filtered_result.jpeg.
+
+Why it was done:
+- The previous evaluator was mixing crop and weed detections and using fallback confidence 1.0 when bboxes_xyxy did not include confidence values.
+- The previous single-number result could not show whether the detector or classifier was the bottleneck.
+- The project needs a trustworthy MH-16 evaluation before more training decisions.
+
+Thought process and reasoning:
+- Since YOLO-NAS was trained as binary crop=0 and weed=1, crop predictions must be discarded before species classification.
+- The five-species classifier can only produce one of the five weed labels; giving it crop boxes guarantees false species predictions.
+- Detector-only metrics are required because a species pipeline cannot recover from missed or badly localized detector boxes.
+- A threshold comparison helps reveal whether poor recall is caused by too strict a confidence cutoff or by boxes being fundamentally mislocalized.
+
+Problems encountered:
+- Base Python did not have super_gradients installed.
+- The project virtualenv at E:/cropandweed-dataset-main/sg_env/Scripts/python.exe had to be used for evaluation.
+- SuperGradients stdout was noisy and only the tqdm progress bars were captured, so saved JSON files were used as the source of truth.
+- At 0.5 confidence, the detector missed most MH-16 target weeds.
+- At 0.25 confidence, recall improved but false positives became very high.
+
+Fixes attempted:
+- Used the project virtualenv for all runtime evaluation.
+- Validated syntax with python -m py_compile before running.
+- Evaluated 100 images at YOLO confidence 0.5.
+- Evaluated 100 images at YOLO confidence 0.25.
+- Saved visual overlays for manual inspection.
+
+Results and observations:
+- At YOLO confidence 0.5 over 100 sorted MH-16 images:
+  - detector TP=8, FP=106, FN=283
+  - detector precision=0.0702
+  - detector recall=0.0275
+  - detector F1=0.0395
+  - average raw detections/image=4.33
+  - average filtered weed detections/image=1.14
+- At YOLO confidence 0.25 over 100 sorted MH-16 images:
+  - detector TP=83, FP=1549, FN=208
+  - detector precision=0.0509
+  - detector recall=0.2852
+  - detector F1=0.0863
+  - average raw detections/image=49.25
+  - average filtered weed detections/image=16.32
+- The 0.25 run shows the detector has weak vegetation signal on MH-16, but the boxes are too noisy for a high-accuracy two-stage species system.
+- The 0.5 run shows confidence filtering reduces noise but destroys recall.
+- Visual inspection showed huge false weed boxes over crop/vegetation regions and many missed ground-truth weed boxes.
+- The classifier was not the bottleneck in this test because the detector rarely localized target weeds correctly enough for the classifier to matter.
+
+Next steps:
+- Do not judge the species classifier from current end-to-end numbers.
+- Fine-tune or retrain the detector on MH-16 rover-style bounding boxes.
+- For Stage 1, use MH-16 labels to train a single vegetation/weed target detector first, then test binary crop/weed only if crop labels are reliable.
+- Try YOLOv8n/YOLOv8s or YOLO11n detector fine-tuning on MH-16 before investing more in YOLO-NAS.
+- Evaluate detector-only mAP/precision/recall on MH-16 after each detector run.
+- Once detector recall is acceptable, re-run the fixed two-stage evaluator and inspect classifier mistakes on correctly localized crops.
+
+
+Iteration 016 - Final Stage 1 Reset To One-Class Plant Detector
+Date: 2026-06-04
+
+What was done:
+- Critically compared the broad CropAndWeed dataset against dense MH-16 rover-style images.
+- Sampled label density and box-size behavior from CropAndWeed YOLO-NAS labels and MH-16 labels.
+- Chose a final Stage 1 design: one-class plant/vegetation localization instead of binary crop-vs-weed detection.
+- Added E:/cropandweed-dataset-main/dataset_yolo_nas/build_stage1_final_dataset.py.
+- Added E:/cropandweed-dataset-main/dataset_yolo_nas/train_stage1_final.py.
+- Added E:/cropandweed-dataset-main/dataset_yolo_nas/validate_stage1_final.py.
+- Built the final mixed dataset at E:/cropandweed-dataset-main/stage1_final_plant_yolo.
+- Started final Stage 1 YOLOv8n training as a background process.
+
+Why it was done:
+- The user wants Stage 1 to work fairly across multiple dataset styles, not only MH-16.
+- The previous binary crop/weed detector transferred poorly from CropAndWeed to MH-16.
+- CropAndWeed has broad plant coverage and spaced scenes; MH-16 has denser rover scenes and different labeling assumptions.
+- Binary crop-vs-weed is not consistently defined across the datasets because MH-16 target labels are weed/species-oriented while CropAndWeed has explicit crop/weed mappings.
+
+Thought process and reasoning:
+- A detector that gates on crop-vs-weed too early is brittle across datasets with different crop annotation policies.
+- A one-class plant detector is more compatible with both datasets because all available boxes can be collapsed into "plant".
+- Crop-vs-weed and species identification should move to Stage 2, where classifier confidence/rejection can handle ambiguity after localization.
+- YOLOv8n at 640 was chosen over YOLO-NAS and over 768 training because Jetson Nano latency/RAM constraints matter and the previous YOLOv8n baseline was easier to train and validate.
+- AMP was disabled because Ultralytics AMP self-check hit a CUDA CUBLAS issue in this Windows environment.
+
+Problems encountered:
+- Full label-density scanning was slow on the E drive, so sampled statistics were used for analysis.
+- The final dataset builder hit the tool timeout during slow summary, but the dataset files and YAML configs were created.
+- One-epoch smoke tests were too slow on the full dataset and left stale Python processes, which were stopped.
+- Start-Process required separate stdout/stderr logs.
+
+Fixes attempted:
+- Made the dataset builder resumable by skipping existing image/label pairs.
+- Removed slow full box-count summary from the builder.
+- Disabled AMP in the final training script.
+- Used direct cmd.exe redirection to start the long training run reliably in the background.
+
+Results and observations:
+- Final dataset paths:
+  - E:/cropandweed-dataset-main/stage1_final_plant_yolo/data.yaml
+  - E:/cropandweed-dataset-main/stage1_final_plant_yolo/data_cnw_val.yaml
+  - E:/cropandweed-dataset-main/stage1_final_plant_yolo/data_mh16_val.yaml
+- Dataset split label counts observed:
+  - train labels: 11935
+  - combined val labels: 2513
+  - CNW-only val labels: 1153
+  - MH16-only val labels: 1360
+- Final training run:
+  - model: YOLOv8n
+  - class: plant
+  - image size: 640
+  - epochs: 120
+  - batch: 8
+  - AMP: false
+  - run folder: E:/cropandweed-dataset-main/runs/detect/Stage1_Final_Plant_yolov8n_640
+  - stdout log: E:/cropandweed-dataset-main/logs/stage1_final_train_20260604_194437.out.log
+  - stderr log: E:/cropandweed-dataset-main/logs/stage1_final_train_20260604_194437.err.log
+- The training job started successfully and scanned 11935 train images with 0 corrupt images.
+- One duplicate label was removed automatically by Ultralytics for cnw_vwg-0010-0006.jpg.
+
+Next steps:
+- Monitor the training log until epoch metrics appear.
+- After training completes, run:
+  python E:/cropandweed-dataset-main/dataset_yolo_nas/validate_stage1_final.py
+- Compare combined, CNW-only, and MH16-only validation metrics.
+- Reconnect the Stage 2 classifier only after Stage 1 reaches acceptable localization recall on both validation splits.
+- Export the best model to ONNX/TensorRT for Jetson Nano only after validation confirms the detector is worth deploying.
+
+
+Iteration 017 - Raspberry Pi 5 Deployment Phase Start
+Date: 2026-07-25
+
+What was done:
+- Started the Raspberry Pi 5 deployment-focused phase for the farm weed detection model.
+- Confirmed the target runtime constraints:
+  - Raspberry Pi 5
+  - 8 GB RAM
+  - memory usage below 5 GB
+  - local camera-feed inference
+  - at least 5 to 6 FPS
+- Established that the next work must proceed step by step and document each checkpoint.
+
+Why it was done:
+- The previous Stage 1 training produced a usable YOLOv8n one-class plant detector baseline, but deployment on Raspberry Pi 5 requires a different optimization mindset than desktop/GPU training.
+- The Pi target makes runtime format, input size, quantization, and memory more important than only desktop mAP.
+
+Thought process and reasoning:
+- PyTorch inference is not the preferred Raspberry Pi deployment path because it is heavier in memory and usually slower.
+- NCNN or TFLite export should be evaluated for local inference.
+- The existing trained model should first be validated across combined, CropAndWeed-only, and MH16-only splits before export work begins.
+- If validation exposes imbalance between sparse and dense datasets, export should wait until the detector is corrected.
+
+Problems encountered:
+- None yet in this phase.
+
+Fixes attempted:
+- No code or training changes yet.
+- The process was documented before running the next validation step.
+
+Results and observations:
+- Current intended model for validation:
+  E:/cropandweed-dataset-main/runs/detect/Stage1_Final_Plant_yolov8n_640/weights/best.pt
+- Current next script:
+  E:/cropandweed-dataset-main/dataset_yolo_nas/validate_stage1_final.py
+
+Next steps:
+- Run separate validation on combined, CNW-only, and MH16-only validation sets.
+- Compare precision, recall, mAP50, and mAP50-95 across dataset styles.
+- Inspect visual outputs if metrics are uneven.
+- Decide whether to export the current model or train smaller Pi-specific 416/320 variants.
+
+
+Iteration 018 - Stage 1 Split Validation For Raspberry Pi Path
+Date: 2026-07-25
+
+What was done:
+- Ran validation for the current Stage 1 YOLOv8n plant detector.
+- Checked the trained weights at:
+  E:/cropandweed-dataset-main/runs/detect/Stage1_Final_Plant_yolov8n_640/weights/best.pt
+- Verified MH16-only validation metrics directly.
+- Verified CropAndWeed-only validation metrics directly.
+- Rechecked the combined training results from results.csv.
+
+Why it was done:
+- Before exporting or optimizing for Raspberry Pi 5, the detector needs to be checked across both sparse/broad CropAndWeed-style images and dense MH16-style rover images.
+- Raspberry Pi deployment work should not proceed blindly if one validation domain is failing.
+
+Thought process and reasoning:
+- The current Stage 1 model is one-class plant localization, which should transfer better than binary crop-vs-weed detection.
+- Separate split validation matters more than combined validation because combined metrics can hide weak dense-scene performance.
+- Recall is especially important for farm weed detection because missed plants cannot be recovered downstream.
+
+Problems encountered:
+- The first validation output was long and truncated in the terminal capture.
+- One visible tail appeared to show very weak MH16 metrics, which conflicted with later direct metric retrieval.
+- To avoid relying on a possibly stale or mixed console tail, each split was verified directly with model.val and printed from the metrics object.
+
+Fixes attempted:
+- Re-ran MH16-only validation directly with plots disabled.
+- Re-ran CropAndWeed-only validation directly with plots disabled.
+- Used the metrics object values rather than reading only progress-bar console text.
+
+Results and observations:
+- Combined validation from training results.csv at epoch 120:
+  - precision: 0.7383
+  - recall: 0.6219
+  - mAP50: 0.6882
+  - mAP50-95: 0.3573
+- MH16-only validation:
+  - precision: 0.6940
+  - recall: 0.5971
+  - mAP50: 0.6628
+  - mAP50-95: 0.2968
+- CropAndWeed-only validation:
+  - precision: 0.7728
+  - recall: 0.6408
+  - mAP50: 0.7109
+  - mAP50-95: 0.4083
+- CropAndWeed performance is better than MH16, but MH16 is not failing.
+- The detector is a reasonable baseline for export/benchmark work, but there is still room to improve dense-scene box quality.
+
+Next steps:
+- Proceed to export planning for Raspberry Pi 5.
+- Prefer NCNN or TFLite deployment instead of PyTorch runtime on Pi.
+- Benchmark model input sizes 640, 416, and 320 before choosing the final Pi runtime size.
+- If 640 is too slow, train or fine-tune a 416-specific variant rather than only resizing a 640-trained model.
+
+
+Iteration 019 - Raspberry Pi Export And Benchmark Planning
+Date: 2026-07-25
+
+What was done:
+- Started the export and runtime benchmark phase for Raspberry Pi 5 deployment.
+- Defined the immediate next target as exporting the current Stage 1 YOLOv8n plant detector to a Pi-friendly runtime format.
+- Chose NCNN as the first export format to test because it is commonly practical for ARM CPU inference and avoids full PyTorch runtime overhead.
+
+Why it was done:
+- The current PyTorch .pt model is useful for training and desktop validation but is not the preferred Raspberry Pi 5 deployment artifact.
+- The deployment target requires at least 5 to 6 FPS and less than 5 GB memory usage.
+- Export/benchmark results are needed before deciding whether to optimize accuracy, speed, or both.
+
+Thought process and reasoning:
+- The model has acceptable validation metrics across combined, CropAndWeed-only, and MH16-only splits.
+- The next unknown is runtime feasibility on Raspberry Pi 5.
+- If the exported model is too slow at 640, input size must be reduced or a smaller/faster model must be trained.
+- Accuracy-improvement work should begin after export/benchmark establishes the runtime budget, because the best accuracy fix may be too slow for the Pi.
+
+Problems encountered:
+- None yet in this phase.
+
+Fixes attempted:
+- No fixes attempted yet.
+
+Results and observations:
+- Current export source:
+  E:/cropandweed-dataset-main/runs/detect/Stage1_Final_Plant_yolov8n_640/weights/best.pt
+- Candidate runtime sizes:
+  - 640: highest current validation alignment, likely slowest
+  - 416: likely best first Pi compromise
+  - 320: fastest, but may hurt small-weed recall
+
+Next steps:
+- Export the current model to NCNN.
+- Inspect generated artifacts and size.
+- Create a Pi benchmark checklist for FPS and memory.
+- Use benchmark results plus split validation to decide whether to train a 416-specific model or improve data/labels first.
+
+
+Iteration 020 - NCNN Export Candidates For Raspberry Pi 5
+Date: 2026-07-25
+
+What was done:
+- Exported the current Stage 1 YOLOv8n plant detector to NCNN at 640 input size.
+- Created local Pi export copies inside C:/Users/Dhruv/Documents/ACE/pi5_exports.
+- Exported additional NCNN candidates at 416 and 320 input size.
+- Ran one-image smoke inference for 640, 416, and 320 NCNN exports.
+
+Why it was done:
+- Raspberry Pi 5 deployment needs a runtime lighter than PyTorch.
+- The model must reach at least 5 to 6 FPS with less than 5 GB RAM.
+- Multiple input sizes are needed because 640 may be accurate but too slow, while 320 may be fast but less reliable for small weeds.
+
+Thought process and reasoning:
+- NCNN was selected first because it is practical for ARM CPU inference.
+- 640 is the accuracy baseline because the model was trained and validated at 640.
+- 416 is the likely best compromise candidate.
+- 320 is the emergency speed candidate if Pi 5 cannot maintain FPS at 416.
+
+Problems encountered:
+- The yolo command was not available on PATH.
+- python -m ultralytics was not supported by the installed Ultralytics package.
+- NCNN and PNNX were missing initially, so Ultralytics auto-installed them into the user Python environment.
+
+Fixes attempted:
+- Used the Ultralytics Python API directly:
+  from ultralytics import YOLO
+  YOLO(...).export(format="ncnn", imgsz=...)
+- Exported 416 and 320 copies inside the ACE workspace to avoid overwriting the 640 export beside the original E-drive model.
+
+Results and observations:
+- 640 NCNN export:
+  - path: E:/cropandweed-dataset-main/runs/detect/Stage1_Final_Plant_yolov8n_640/weights/best_ncnn_model
+  - model.ncnn.bin size: 12124428 bytes
+  - input shape: 1x3x640x640
+  - FLOPS estimate: 8.186G
+  - one-image desktop CPU smoke speed: preprocess 12.8 ms, inference 96.2 ms, postprocess 14.8 ms
+- 416 NCNN export:
+  - path: C:/Users/Dhruv/Documents/ACE/pi5_exports/stage1_plant_416_ncnn_model
+  - input shape: 1x3x416x416
+  - FLOPS estimate: 3.459G
+  - one-image desktop CPU smoke speed: preprocess 5.9 ms, inference 29.9 ms, postprocess 1.6 ms
+- 320 NCNN export:
+  - path: C:/Users/Dhruv/Documents/ACE/pi5_exports/stage1_plant_320_ncnn_model
+  - input shape: 1x3x320x320
+  - FLOPS estimate: 2.046G
+  - one-image desktop CPU smoke speed: preprocess 1.5 ms, inference 15.9 ms, postprocess 0.7 ms
+- The speed trend strongly suggests 416 or 320 will be more realistic than 640 for Raspberry Pi 5.
+
+Next steps:
+- Validate 416 NCNN on MH16-only and CropAndWeed-only splits.
+- Validate 320 NCNN on MH16-only and CropAndWeed-only splits.
+- Compare accuracy drop against speed gain.
+- Decide whether to deploy 416 directly, deploy 320, or train a true 416-specific model.
+
+
+Iteration 021 - NCNN Size Accuracy Tradeoff Analysis
+Date: 2026-07-25
+
+What was done:
+- Validated the 416 NCNN export on MH16-only and CropAndWeed-only splits.
+- Validated the 320 NCNN export on MH16-only and CropAndWeed-only splits.
+- Compared exported smaller input sizes against the original 640 PyTorch validation baseline.
+- Identified the first formal point where overall performance improvement analysis should begin.
+
+Why it was done:
+- Raspberry Pi 5 needs speed, but the model cannot be reduced blindly if the accuracy loss is too large.
+- CNW and MH16 represent different image types:
+  - CNW has more broad/spaced/smaller plant instances.
+  - MH16 has denser rover-style scenes.
+- The final model must balance both styles, not only look good on one validation split.
+
+Thought process and reasoning:
+- 640 is the strongest accuracy baseline but likely too slow for Raspberry Pi 5.
+- 416 is the main deployment candidate if it keeps enough recall.
+- 320 is the speed fallback if 416 is too slow on the Pi.
+- Performance-improvement analysis should start after:
+  1. baseline split metrics are known,
+  2. exported runtime candidates are available,
+  3. accuracy drop from resizing/export is measured,
+  4. at least one speed signal exists.
+- This point has now been reached for desktop-side export validation; final Pi decision still requires actual Pi benchmark numbers.
+
+Problems encountered:
+- Long validation console output was truncated.
+- The first 416 CNW metric line was hidden by terminal progress output.
+
+Fixes attempted:
+- Wrote validation metrics into C:/Users/Dhruv/Documents/ACE/pi5_exports/ncnn_validation_summary.json during validation.
+- Used the metrics object values rather than relying on terminal tails.
+
+Results and observations:
+- Original 640 PyTorch baseline:
+  - CNW: precision 0.7728, recall 0.6408, mAP50 0.7109, mAP50-95 0.4083
+  - MH16: precision 0.6940, recall 0.5971, mAP50 0.6628, mAP50-95 0.2968
+- 416 NCNN:
+  - CNW: precision 0.7406, recall 0.5335, mAP50 0.5913, mAP50-95 0.3180
+  - MH16: precision 0.6830, recall 0.5811, mAP50 0.6390, mAP50-95 0.2758
+- 320 NCNN:
+  - CNW: precision 0.7134, recall 0.4464, mAP50 0.4917, mAP50-95 0.2539
+  - MH16: precision 0.6475, recall 0.5447, mAP50 0.5903, mAP50-95 0.2437
+- 416 preserves MH16 reasonably well but hurts CNW small/spaced object recall.
+- 320 is probably only acceptable if Pi speed at 416 is not enough.
+- The accuracy drop is dataset-dependent: CNW suffers more than MH16 when input size is reduced.
+
+Next steps:
+- Benchmark 416 and 320 on the actual Raspberry Pi 5.
+- If 416 reaches at least 5 to 6 FPS and stays below 5 GB RAM, use 416 as the first deployment candidate.
+- If 416 is too slow, test 320, but expect lower CNW/small-object recall.
+- If 416 speed is acceptable but CNW recall is too low, train a true 416-specific model with more small-object augmentation rather than simply exporting the 640-trained model at 416.
+- Begin performance-improvement work after Pi benchmark confirms whether the bottleneck is speed or accuracy.
+
+
+Iteration 022 - Raspberry Pi Benchmark Script And Decision Gate
+Date: 2026-07-25
+
+What was done:
+- Added C:/Users/Dhruv/Documents/ACE/scripts/benchmark_pi5_ncnn.py.
+- Syntax-checked the benchmark script.
+- Updated C:/Users/Dhruv/Documents/ACE/pi5_exports/ncnn_validation_summary.json with complete 416 and 320 split metrics.
+- Defined the decision gate for when to start performance-improvement changes.
+
+Why it was done:
+- Desktop validation and smoke timing are useful but not enough to decide the Raspberry Pi 5 deployment model.
+- The actual Pi must be measured for FPS and RAM because ARM CPU behavior will differ from the laptop CPU.
+- A repeatable benchmark script avoids guessing and gives comparable results for 416 and 320.
+
+Thought process and reasoning:
+- 416 is the leading candidate because it keeps MH16 performance close to the 640 baseline while reducing FLOPS substantially.
+- 320 is the fallback if 416 cannot reach the required FPS on Raspberry Pi 5.
+- The 416 export loses notable CNW recall, so if 416 is fast enough but accuracy is not good enough, the next correct move is training a 416-specific model, not simply accepting the resized export.
+- Performance improvements should be planned after knowing whether the actual bottleneck is:
+  - speed/FPS,
+  - memory,
+  - dense-image accuracy,
+  - small/spaced-object accuracy,
+  - or threshold/post-processing behavior.
+
+Problems encountered:
+- The first JSON validation summary did not include the 416 MH16 run because that validation was run before JSON summary writing was added.
+
+Fixes attempted:
+- Added the verified 416 MH16 metrics manually to ncnn_validation_summary.json.
+- Confirmed benchmark_pi5_ncnn.py compiles successfully.
+
+Results and observations:
+- Benchmark script path:
+  C:/Users/Dhruv/Documents/ACE/scripts/benchmark_pi5_ncnn.py
+- 416 NCNN validation:
+  - MH16: precision 0.6830, recall 0.5811, mAP50 0.6390, mAP50-95 0.2758
+  - CNW: precision 0.7406, recall 0.5335, mAP50 0.5913, mAP50-95 0.3180
+- 320 NCNN validation:
+  - MH16: precision 0.6475, recall 0.5447, mAP50 0.5903, mAP50-95 0.2437
+  - CNW: precision 0.7134, recall 0.4464, mAP50 0.4917, mAP50-95 0.2539
+- 416 is the current best deployment candidate.
+- 320 should only be chosen if 416 misses the Pi 5 FPS/RAM target.
+
+Next steps:
+- Copy the benchmark script and one or both NCNN model folders to the Raspberry Pi 5.
+- Benchmark image-folder mode first.
+- Benchmark camera mode second.
+- Record FPS, p95 latency, average boxes, and peak RSS memory.
+- Start performance-improvement changes only after Pi benchmark results are available.
+
+
+Iteration 023 - Pi Deployment Checklist And Performance Analysis Trigger
+Date: 2026-07-25
+
+What was done:
+- Reviewed the current Pi export artifacts and validation summary.
+- Confirmed that 416 NCNN and 320 NCNN exports are available inside C:/Users/Dhruv/Documents/ACE/pi5_exports.
+- Added C:/Users/Dhruv/Documents/ACE/PI5_STAGE1_DEPLOYMENT_CHECKLIST.txt.
+- Documented the exact files to copy to Raspberry Pi 5.
+- Documented the benchmark commands for image-folder mode and camera mode.
+- Defined when performance-improvement analysis should start.
+
+Why it was done:
+- The project has moved from training/validation into deployment testing.
+- Raspberry Pi 5 runtime behavior cannot be trusted from laptop speed alone.
+- A written checklist reduces confusion when manually moving files and running benchmarks on the Pi.
+- The project needs a clear decision gate so we do not retrain randomly without knowing whether the actual bottleneck is speed, memory, or accuracy.
+
+Thought process and reasoning:
+- The 416 NCNN export is the current primary candidate because it keeps MH16 dense-scene performance closest to the 640 baseline while reducing compute heavily.
+- The 320 NCNN export is kept as a fallback because it is much faster, but the accuracy drop is substantial, especially on CNW-style small/spaced objects.
+- Performance analysis can begin now at the diagnostic level because split metrics and export metrics exist.
+- Actual model-change decisions should wait until Raspberry Pi 5 benchmark results are available.
+- If 416 reaches 5 to 6 FPS under 5 GB RAM, the next work should focus on improving accuracy.
+- If 416 is too slow, the next work should focus on speed: 320, lower camera resolution, frame skipping, runtime settings, or training a smaller/input-specific detector.
+
+Problems encountered:
+- No new technical error occurred during this step.
+- The remaining uncertainty is hardware-specific: actual Raspberry Pi 5 FPS and memory use are still unknown.
+
+Fixes attempted:
+- Created a standalone deployment checklist with exact commands and files.
+- Preserved the existing iteration history and appended this update at the bottom of the same text file.
+
+Results and observations:
+- Deployment checklist created:
+  C:/Users/Dhruv/Documents/ACE/PI5_STAGE1_DEPLOYMENT_CHECKLIST.txt
+- Current benchmark script:
+  C:/Users/Dhruv/Documents/ACE/scripts/benchmark_pi5_ncnn.py
+- Current validation summary:
+  C:/Users/Dhruv/Documents/ACE/pi5_exports/ncnn_validation_summary.json
+- Recommended order:
+  1. Benchmark 416 NCNN first.
+  2. Benchmark 320 NCNN only if 416 misses the FPS target.
+- Current diagnosis:
+  - 416 is likely the best first real-world deployment candidate.
+  - 320 is speed-oriented but may miss too many small/spaced plants.
+  - CNW-style recall is the main accuracy weakness after reducing input size.
+
+Next steps:
+- Move the benchmark script and NCNN model folders to Raspberry Pi 5.
+- Run image-folder benchmark first with real or representative farm/rover images.
+- Run camera benchmark second.
+- Report FPS, average latency, p95 latency, peak RSS memory, average boxes per frame, and camera resolution.
+- After the Pi numbers are available:
+  - If 416 passes FPS/memory, start accuracy improvement.
+  - If 416 fails FPS, test 320 and focus on runtime/input-size optimization.
+  - If both are too slow, reconsider model size and pipeline strategy.
+
+
+Iteration 024 - Laptop Benchmark After NCNN Optimization
+Date: 2026-07-25
+
+What was done:
+- Ran laptop image-folder benchmarks for optimized NCNN exports before Raspberry Pi deployment.
+- Benchmarked 416 NCNN on CNW validation images.
+- Benchmarked 416 NCNN on MH16 validation images.
+- Benchmarked 320 NCNN on CNW validation images.
+- Benchmarked 320 NCNN on MH16 validation images.
+- Benchmarked 640 NCNN for comparison against the optimized smaller exports.
+- Attempted laptop camera benchmark for 416 and 320.
+- Saved benchmark results to C:/Users/Dhruv/Documents/ACE/pi5_exports/laptop_ncnn_benchmark_summary.json.
+
+Why it was done:
+- The model should be tested locally after optimization before moving to Raspberry Pi 5.
+- Laptop benchmark results provide a quick sanity check that the exported NCNN models run correctly.
+- Comparing 640, 416, and 320 shows whether lower input sizes are actually helping runtime.
+- Testing both CNW and MH16-style validation folders checks performance on spaced/smaller plants and dense rover-style images.
+
+Thought process and reasoning:
+- 640 has the best validation accuracy but is expected to be too slow for edge deployment.
+- 416 is expected to be the best balance between accuracy and speed.
+- 320 is expected to be faster but less accurate.
+- If 320 does not provide a meaningful speed improvement, it should not be preferred because its accuracy is worse.
+- Image-folder benchmark is not identical to camera runtime, but it is enough to compare model/input-size behavior before Pi deployment.
+
+Problems encountered:
+- Laptop camera benchmark failed because OpenCV could not open camera index 0 in this session.
+- 320 was only slightly faster than 416 on laptop image-folder benchmark, likely because Python/Ultralytics/image-loading overhead contributes significantly.
+
+Fixes attempted:
+- Used image-folder benchmarks as the reliable local comparison.
+- Kept camera testing for the Raspberry Pi 5, where the actual rover/camera setup will be available.
+- Added a JSON benchmark summary so results are preserved outside terminal output.
+
+Results and observations:
+- 640 NCNN on CNW:
+  - avg 230.19 ms, p95 292.41 ms, 4.34 FPS, peak RSS 636.5 MB
+- 640 NCNN on MH16:
+  - avg 215.83 ms, p95 250.96 ms, 4.63 FPS, peak RSS 635.5 MB
+- 416 NCNN on CNW:
+  - avg 78.86 ms, p95 95.97 ms, 12.68 FPS, peak RSS 582.4 MB
+- 416 NCNN on MH16:
+  - avg 63.96 ms, p95 76.69 ms, 15.63 FPS, peak RSS 581.5 MB
+- 320 NCNN on CNW:
+  - avg 75.13 ms, p95 98.43 ms, 13.31 FPS, peak RSS 565.5 MB
+- 320 NCNN on MH16:
+  - avg 60.59 ms, p95 84.73 ms, 16.50 FPS, peak RSS 564.5 MB
+- 416 is much faster than 640 and remains the best deployment candidate.
+- 320 does not provide enough extra laptop speed to justify its larger accuracy loss unless Raspberry Pi 5 testing proves 416 is too slow.
+- 640 should not be deployed to Raspberry Pi 5 for the 5 to 6 FPS target.
+
+Next steps:
+- Deploy-test 416 NCNN on Raspberry Pi 5 first.
+- Run the same benchmark script in image-folder mode on the Pi.
+- Run the same benchmark script in camera mode on the Pi.
+- Only test 320 on the Pi if 416 fails the FPS target.
+- If 416 passes on the Pi, begin accuracy-improvement analysis focused mainly on CNW/small-spaced-object recall and real rover camera validation.
+
+
+Iteration 025 - Stage 1 Improvement Attempt Before Pi Deployment
+Date: 2026-07-26
+
+What was done:
+- Added C:/Users/Dhruv/Documents/ACE/scripts/sweep_stage1_thresholds.py.
+- Ran a 416 validation threshold sweep on CNW and MH16 splits.
+- Added C:/Users/Dhruv/Documents/ACE/scripts/train_stage1_improve_416.py for a 416-native fine-tuning attempt.
+- Added C:/Users/Dhruv/Documents/ACE/scripts/train_stage1_improve_416_lowlr.py for a safer low-learning-rate adaptation attempt.
+- Ran multiple training probes from the current best 640-trained YOLOv8n model.
+- Benchmarked 416 NCNN at a lower confidence threshold of 0.10.
+- Updated C:/Users/Dhruv/Documents/ACE/scripts/benchmark_pi5_ncnn.py default confidence from 0.35 to 0.10.
+- Updated C:/Users/Dhruv/Documents/ACE/PI5_STAGE1_DEPLOYMENT_CHECKLIST.txt to use --conf 0.10.
+- Updated C:/Users/Dhruv/Documents/ACE/pi5_exports/laptop_ncnn_benchmark_summary.json with recall-first 0.10 benchmark results.
+
+Why it was done:
+- The goal is to improve Stage 1 detection performance before Raspberry Pi deployment, not only resize models.
+- Earlier analysis showed 416 is the best deployment input size, but CNW/small-spaced-object recall is weaker than desired.
+- Threshold tuning is a low-risk way to improve practical recall without retraining.
+- A 416-native fine-tune was tested because training directly at deployment size can sometimes improve the model after export.
+
+Thought process and reasoning:
+- Stage 1 should prioritize recall because missed plants/weeds cannot be recovered later.
+- Extra candidate boxes are acceptable if Stage 2 classification/filtering will reject wrong crops/background later.
+- The first retraining idea used 416 images, lower scale augmentation, and moderate mosaic to better match deployment.
+- After the aggressive recipe regressed and hit memory issues, a low-learning-rate recipe was tried to avoid damaging the already-good pretrained detector.
+- The available local Ultralytics package includes yolov8-p2.yaml, which may help small objects, but it is a larger architecture experiment and may reduce Raspberry Pi FPS.
+- The immediate practical improvement is to deploy 416 NCNN with conf 0.10 rather than 0.35.
+
+Problems encountered:
+- The full threshold sweep with multiple IoU values was too slow with workers=0 and timed out before completion.
+- Dataloader workers failed under the normal sandbox with a Windows multiprocessing access-denied error.
+- Running workers=2 outside the sandbox failed with fatal memory allocation and CUDA unknown error.
+- Batch 16 training caused CUDA out-of-memory.
+- Batch 8 training avoided CUDA OOM but failed with OpenCV host-memory allocation while reading images.
+- Batch 4 training was stable but too slow with workers=0.
+- The aggressive 416 fine-tune completed 3 epochs before timeout but underperformed the original baseline.
+- The low-learning-rate 416 fine-tune completed 1 epoch, then hit the same OpenCV host-memory allocation failure near the end of epoch 2.
+
+Fixes attempted:
+- Reduced batch size from 16 to 8, then to 4.
+- Reduced mosaic from 0.60 to 0.35 for the first stable run.
+- Disabled plots to reduce overhead.
+- Created a separate lower-risk low-learning-rate script with lr0 0.0001, mosaic 0.10, lower color/geometry augmentation, and workers=0.
+- Changed the threshold sweep script to write CSV rows incrementally so progress is not lost on timeout.
+- Compared original model 416 default validation against the fine-tuned checkpoints before assuming training helped.
+- Benchmarked conf 0.10 locally to check whether recall-first deployment remains fast enough.
+
+Results and observations:
+- Original best.pt at 416 combined default validation:
+  - precision 0.7138, recall 0.5571, mAP50 0.6152, mAP50-95 0.3082
+- Aggressive 416 fine-tune, epoch 3:
+  - precision 0.7009, recall 0.5412, mAP50 0.6019, mAP50-95 0.2999
+  - This is worse than the original 416 baseline.
+- Low-learning-rate 416 fine-tune, epoch 1:
+  - precision 0.7052, recall 0.5556, mAP50 0.6111, mAP50-95 0.3075
+  - This is close to the original baseline but not better.
+- Threshold sweep at 416 showed:
+  - CNW best practical F1 occurred around conf 0.03 to 0.10 with recall 0.5520.
+  - CNW higher confidence 0.35 improved precision but reduced recall.
+  - MH16 best F1 occurred around conf 0.03 to 0.10 with recall 0.6248.
+- Laptop 416 NCNN at conf 0.10:
+  - CNW: avg 109.43 ms, p95 130.35 ms, 9.14 FPS, avg 19.89 boxes, peak RSS 582.4 MB
+  - MH16: avg 88.76 ms, p95 107.36 ms, 11.27 FPS, avg 15.21 boxes, peak RSS 581.3 MB
+- Lower confidence increases candidate boxes but still passes laptop speed target.
+- Current best deployable improvement is not a new checkpoint; it is using the existing 416 NCNN model with conf 0.10.
+
+Next steps:
+- Do not replace the current model with either fine-tuned checkpoint yet.
+- Use existing 416 NCNN as the model candidate.
+- Use conf 0.10 as the recall-first deployment setting.
+- On Raspberry Pi 5, benchmark 416 NCNN with conf 0.10 first.
+- If false positives are too high in real camera footage, test conf 0.15 or 0.20 before retraining.
+- For actual model improvement beyond threshold tuning, consider a controlled yolov8-p2 small-object experiment or a memory-stable training environment before spending more time on the current Windows/OpenCV training path.
+
+
+Iteration 026 - GitHub Upload Preparation
+Date: 2026-08-03
+
+What was done:
+- Checked that C:/Users/Dhruv/Documents/ACE is already a git repository.
+- Checked that the target GitHub repository https://github.com/Dhruv0956/motorq-projects.git is reachable.
+- Cloned the target repository to C:/Users/Dhruv/Desktop/motorq-projects.
+- Copied the ACE project into C:/Users/Dhruv/Desktop/motorq-projects/Weed-Detection.
+- Excluded local git metadata, datasets, runs, temporary validation files, cache files, model weights, and common export binaries from the copy/staging process.
+- Verified that NCNN model binaries are ignored by Weed-Detection/.gitignore.
+- Staged the Weed-Detection project for commit in the motorq-projects repository.
+
+Why it was done:
+- The project needs to be uploaded to GitHub for internship submission/use.
+- Uploading everything blindly would risk committing large datasets, generated training runs, cache folders, or model binaries.
+- Keeping the repository focused on source code, configs, documentation, metrics, and deployment instructions makes it easier for reviewers to understand.
+
+Thought process and reasoning:
+- The GitHub repository target is a subfolder, Weed-Detection, inside the existing motorq-projects repository.
+- The safest workflow is to clone motorq-projects separately and copy this project into that subfolder.
+- Datasets and trained weights should not be committed directly unless Git LFS or GitHub Releases are intentionally used.
+- Documentation and iteration history should be included because they explain the decisions and trial-and-error process.
+
+Problems encountered:
+- The first copy physically copied NCNN export folders into the local clone, but they are ignored by .gitignore and are not staged.
+- Robocopy returned exit code 1, which is normal for "files copied" and not a failure.
+
+Fixes attempted:
+- Used git check-ignore to verify NCNN model binaries are ignored.
+- Reviewed git status, staged file names, and staged numstat before committing.
+
+Results and observations:
+- Staged files include scripts, configs, README, model reports, benchmark summaries, threshold sweep CSV, requirements, split lists, and this iteration log.
+- Staged files do not include datasets, runs, .pt weights, ONNX/TensorRT/TFLite exports, or NCNN model binary folders.
+- The local clone path is C:/Users/Dhruv/Desktop/motorq-projects.
+- The target project path is C:/Users/Dhruv/Desktop/motorq-projects/Weed-Detection.
+
+Next steps:
+- Copy this updated ITERATION_LOG.txt into the cloned repository.
+- Stage the updated iteration log.
+- Commit the Weed-Detection project.
+- Push the commit to origin/main.

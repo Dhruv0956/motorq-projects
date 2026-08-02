@@ -1,0 +1,10 @@
+path: C:/Users/Dhruv/Documents/ACE/datasets/Top5_Weeds_Dataset
+train: train/images
+val: val/images
+
+names:
+  0: Lavhala
+  1: Bilayat
+  2: Gajar_Gavat
+  3: Harali
+  4: Punarnava

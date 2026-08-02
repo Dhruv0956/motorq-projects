@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+datasets/
+*.pt
+*.onnx
+*.engine
+*.tflite
+*_ncnn_model/
+*_openvino_model/

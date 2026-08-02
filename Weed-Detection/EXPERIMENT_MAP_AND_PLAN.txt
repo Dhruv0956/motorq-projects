@@ -1,0 +1,471 @@
+ACE Weed/Crop Rover Model - Experiment Map And Next Plan
+=========================================================
+
+Date: 2026-05-24
+Scope: Planning and context consolidation only. No training, export, file cleanup, or dataset mutation was performed for this plan.
+
+
+1. Current Aim
+--------------
+
+Build a high-accuracy local model pipeline for Jetson Nano that can:
+- Read rover camera frames.
+- Detect crop/weed regions with bounding boxes.
+- Identify weed species for the most important species.
+- Run locally on the Jetson Nano without network calls.
+
+Current preferred architecture:
+- Stage 1: YOLO detector for field localization.
+- Stage 2: classifier for species identification on cropped weed detections.
+
+This is the right direction. Detection and fine-grained species recognition are different problems, and separating them reduces confusion during training and evaluation.
+
+
+2. Dataset Map
+--------------
+
+2.1 datasets/weeds
+
+Purpose:
+- Older 2-class crop/weed detector dataset.
+
+Config:
+- configs/weed_crop.yaml
+- Class 0: crop
+- Class 1: weed
+
+Observed distribution:
+- Train images: 1040
+- Val images: 260
+- Train boxes: 1703
+  - crop: 1004
+  - weed: 699
+- Val boxes: 369
+  - crop: 208
+  - weed: 161
+
+Usefulness:
+- Good for baseline crop-vs-weed detection.
+- May not match MH-16 rover-camera domain.
+- Not useful for species classification.
+
+
+2.2 datasets/weeds1
+
+Purpose:
+- Roboflow single-class weed dataset.
+
+Config:
+- configs/data.yaml
+- Class: Weeds
+
+Usefulness:
+- Good for generic weed detection experiments.
+- Likely weaker for final rover deployment if it differs from the MH-16 camera/field setup.
+- Earlier run weed_crop5 achieved strong metrics on this dataset.
+
+
+2.3 datasets/Top5_Weeds_Dataset
+
+Purpose:
+- Top5 species dataset created from individual weed species images.
+
+Config:
+- configs/dataset.yaml
+
+Classes:
+- 0: Lavhala
+- 1: Bilayat
+- 2: Gajar_Gavat
+- 3: Harali
+- 4: Punarnava
+
+Observed distribution:
+- Train images: 3864
+- Val images: 968
+- Train boxes: 3864
+  - Lavhala: 941
+  - Bilayat: 687
+  - Gajar_Gavat: 1234
+  - Harali: 567
+  - Punarnava: 435
+- Val boxes: 968
+  - Lavhala: 236
+  - Bilayat: 172
+  - Gajar_Gavat: 309
+  - Harali: 142
+  - Punarnava: 109
+
+Important caveat:
+- Every label is a full-frame YOLO box: x=0.5, y=0.5, w=1.0, h=1.0.
+- This means the dataset behaves like a species classifier wrapped in YOLO format.
+- It should not be treated as a real object detector dataset for precise field localization.
+
+Usefulness:
+- Useful for initial species classifier training.
+- Not enough for final detector training unless real plant boxes are added.
+
+
+2.4 datasets/Field_Binary_Dataset
+
+Purpose:
+- MH-16 rover/field dataset linked from raw images and annotations.
+
+Config:
+- configs/dataset_stage1.yaml
+
+Important naming issue:
+- Folder name says "Binary", but config lists multiple species classes.
+- The training script train_stage1_binary.py uses single_cls=True, collapsing species labels into one weed class.
+
+Storage detail:
+- Images and labels appear as Windows symlinks.
+- File length appears as 0 because they are symlink entries, not empty real files.
+- This is not automatically bad, but scripts that rewrite labels may modify the linked raw label targets.
+
+Observed distribution:
+- Train label files: 5324
+- Train boxes: 49383
+- Val label files: 1332
+- Val boxes: 12657
+
+Observed class counts:
+- Class 0: train 5167, val 1345, total 6512
+- Class 1: train 18017, val 4712, total 22729
+- Class 2: train 17911, val 4483, total 22394
+- Class 3: train 1788, val 429, total 2217
+- Class 4: train 1409, val 395, total 1804
+- Class 5: train 1827, val 451, total 2278
+- Class 6: train 149, val 31, total 180
+- Class 7: train 168, val 46, total 214
+- Class 8: train 675, val 161, total 836
+- Class 9: train 1111, val 313, total 1424
+- Class 10: train 373, val 103, total 476
+- Class 11: train 96, val 30, total 126
+- Class 12: train 329, val 70, total 399
+- Class 13: train 155, val 29, total 184
+- Class 14: train 208, val 59, total 267
+- Class 15: not observed in this split/count pass
+
+Config class names:
+- 0: Kena
+- 1: Lavhala
+- 2: Lamber_Quarter
+- 3: Little_Mallow
+- 4: Moti_dudhi
+- 5: Obscure_morning_glory
+- 6: Asian_Pigeonwings
+- 7: Bilayat
+- 8: Choti_dudhi
+- 9: Digitaria_SP
+- 10: Gajar_gavat
+- 11: Graceful_Sandmart
+- 12: Sicklepod
+- 13: Harali
+- 14: Dwarf_cassia
+- 15: Punarnava
+
+Most common field species by annotation count:
+- Lavhala: 22729
+- Lamber_Quarter: 22394
+- Kena: 6512
+- Obscure_morning_glory: 2278
+- Little_Mallow: 2217
+
+Important caveat:
+- This field-based top 5 is not the same as the current Top5_Weeds_Dataset.
+- Current Top5_Weeds_Dataset includes Bilayat, Gajar_Gavat, Harali, and Punarnava, which are rare or absent in the field annotation count.
+
+Usefulness:
+- This is likely the most important dataset for Stage 1 detector training because it matches field/rover context.
+- It can also be used to generate cropped weed images for a better Stage 2 classifier.
+
+
+3. Run Map
+----------
+
+3.1 runs/detect/runs/detect/weed_crop2
+
+Dataset:
+- configs/weed_crop.yaml
+
+Model:
+- yolo11n.pt
+
+Purpose:
+- Older 2-class crop/weed detector.
+
+Last metrics:
+- Precision: 0.88314
+- Recall: 0.80687
+- mAP50: 0.89577
+- mAP50-95: 0.61062
+
+Status:
+- Useful baseline.
+- Not the final rover model because it is not MH-16 species-aware.
+
+
+3.2 runs/detect/runs/detect/weed_crop5
+
+Dataset:
+- configs/data.yaml
+
+Model:
+- yolo11n.pt
+
+Purpose:
+- Single-class Roboflow weed detector.
+
+Last metrics:
+- Precision: 0.94295
+- Recall: 0.95210
+- mAP50: 0.97684
+- mAP50-95: 0.78458
+
+Status:
+- Strong single-class weed detector on its dataset.
+- Good reference point, but may not transfer perfectly to MH-16 rover frames.
+
+
+3.3 runs/detect/train8
+
+Dataset:
+- configs/dataset.yaml
+- Top5_Weeds_Dataset
+
+Model:
+- YOLO run resumed from its own checkpoint.
+
+Purpose:
+- 5-species experiment using full-frame labels.
+
+Last metrics:
+- Precision: 0.98174
+- Recall: 0.98518
+- mAP50: 0.99378
+- mAP50-95: 0.99378
+
+Interpretation:
+- Metrics are extremely high because each image has a full-frame box.
+- This is more like image classification than real detection.
+
+Status:
+- Useful as evidence that species are visually separable in clean individual-species images.
+- Do not treat this as proof that the rover can localize and classify small weeds in field frames.
+
+
+3.4 runs/detect/train13
+
+Dataset:
+- configs/dataset_stage1.yaml
+- Field_Binary_Dataset
+
+Model:
+- Resumed from train13 checkpoint.
+
+Purpose:
+- Field detector using single_cls=True, collapsing all species into one class.
+
+Training detail:
+- val=False and plots=False in resumed training.
+
+Last results.csv values:
+- Metrics are 0 in the final rows because validation was disabled during resumed training.
+
+Status:
+- Potentially important Stage 1 detector checkpoint.
+- Needs a separate safe validation pass before deciding whether to keep it.
+
+
+3.5 runs/detect/train9
+
+Dataset:
+- configs/dataset_stage1.yaml
+
+Purpose:
+- Early Stage 1 attempt.
+
+Observed result:
+- Only 2 epochs in results.csv.
+- Metrics are 0.
+
+Status:
+- Treat as failed/incomplete.
+
+
+4. Key Findings
+---------------
+
+4.1 The two-stage plan is correct.
+
+Best structure:
+- Detector finds weeds/plants in rover frames.
+- Classifier identifies weed species on cropped detections.
+
+This prevents the classifier from needing to solve localization and prevents the detector from needing to learn fine-grained species differences too early.
+
+
+4.2 Current Top5 species selection may be wrong for rover field deployment.
+
+Current Top5_Weeds_Dataset:
+- Lavhala
+- Bilayat
+- Gajar_Gavat
+- Harali
+- Punarnava
+
+Field annotation top 5:
+- Lavhala
+- Lamber_Quarter
+- Kena
+- Obscure_morning_glory
+- Little_Mallow
+
+Decision needed:
+- If the final rover must identify the most common field species, use the field top 5.
+- If the user specifically needs the current named species for agronomic reasons, keep them, but understand some are rare/absent in field labels.
+
+
+4.3 Crop detection is not yet solved by MH-16.
+
+The MH-16 field config lists weed species, not crop.
+
+Open question:
+- Are crop boxes present in any MH-16 labels?
+- If not, Stage 1 can detect weeds, but it cannot properly detect crop boxes unless a crop-labeled dataset is added.
+
+
+4.4 Some scripts are useful but risky.
+
+Useful:
+- train_stage1_binary.py: trains field detector with all species collapsed to weed.
+- validate_stage1.py: safe validation pass for train13.
+- build_dataset.py: generated Top5 full-frame dataset.
+- create_field_links.py: builds symlinked field dataset.
+
+Risky:
+- clean_corrupt_boxes.py rewrites labels inside Field_Binary_Dataset.
+- Because those labels are symlinks, rewriting may modify raw annotation files on Desktop.
+- Do not run it again until this behavior is made safe by copying labels instead of writing through symlinks.
+
+
+5. Recommended Architecture
+---------------------------
+
+Stage 1 Detector:
+- Goal: localize field weeds, and crop only if crop labels exist.
+- Starting model: YOLOv8n or YOLO11n.
+- Input size: 640 for accuracy first.
+- Training dataset: Field_Binary_Dataset.
+- Class mode:
+  - Option A: single_cls=True for one "weed" class, simplest and robust.
+  - Option B: multi-class field detector for top 5 species directly, only after Stage 1 single-class quality is proven.
+
+Stage 2 Species Classifier:
+- Goal: classify cropped weed detections into 5 species.
+- Starting model: YOLO classification nano/small or MobileNet/EfficientNet-lite style classifier.
+- Training data:
+  - Best: crops extracted from Field_Binary_Dataset boxes for selected species.
+  - Backup: Top5_Weeds_Dataset individual species images.
+- Output:
+  - species name
+  - classifier confidence
+
+Pipeline:
+- Capture frame from rover camera.
+- Run Stage 1 detector.
+- For each weed detection, crop the box with padding.
+- Run Stage 2 classifier on the crop.
+- Draw box and label:
+  - weed species if classifier confidence is high
+  - weed_unknown if classifier confidence is low
+  - crop only if crop detector exists
+
+
+6. Next Execution Plan
+----------------------
+
+Step 1: Freeze current artifacts.
+- Do not delete any runs.
+- Treat train8, train13, weed_crop5, and weed_crop2 as reference points.
+- Start naming future runs explicitly instead of relying on train14/train15 auto names.
+
+Step 2: Validate train13 safely.
+- Run a validation-only pass on train13 best.pt using configs/dataset_stage1.yaml.
+- Use low batch and workers=0.
+- This tells whether train13 is a real Stage 1 detector candidate.
+
+Step 3: Decide the target five species.
+- Recommended if optimizing for field frequency:
+  - Lavhala
+  - Lamber_Quarter
+  - Kena
+  - Obscure_morning_glory
+  - Little_Mallow
+- Alternative if agronomic requirement overrides frequency:
+  - Keep current Top5 list, but expect lower field performance for rare species.
+
+Step 4: Build a classifier dataset from field crops.
+- For selected five species, crop boxes from Field_Binary_Dataset images.
+- Save classifier folders:
+  - datasets/Field_Top5_Classifier/train/<species_name>/
+  - datasets/Field_Top5_Classifier/val/<species_name>/
+- Add padding around boxes so leaves are not clipped.
+- Keep a low-confidence/unknown policy for deployment.
+
+Step 5: Train Stage 2 classifier.
+- Start small.
+- Prioritize per-class recall and confusion matrix.
+- Do not judge it only by global accuracy because class imbalance is large.
+
+Step 6: Re-train or keep Stage 1 detector based on validation.
+- If train13 validates well, keep it as Stage 1 candidate.
+- If train13 is weak, retrain Stage 1 from a clean YOLO nano model with:
+  - single_cls=True
+  - imgsz=640
+  - cache=False
+  - workers=0 or 2
+  - explicit run name
+
+Step 7: Integrate detector + classifier locally.
+- Create an inference script that accepts:
+  - detector weights
+  - classifier weights
+  - camera/video source
+  - FPS throttle
+- Output annotated frames with species names.
+
+Step 8: Jetson Nano deployment.
+- Export detector to TensorRT FP16.
+- Export classifier to TensorRT FP16.
+- Benchmark on Jetson Nano at target camera resolution.
+- If FPS is below target, reduce detector imgsz before reducing classifier quality.
+
+
+7. Decision Checklist Before Next Training
+------------------------------------------
+
+Answer these before training again:
+
+- Do we need crop boxes, or is weed localization enough?
+- Which five species matter most: field-frequency top 5 or agronomic-priority top 5?
+- Is train13 good enough as Stage 1 after validation?
+- Should future field dataset use symlinks, or should labels/images be copied to avoid accidental raw data mutation?
+- What Jetson Nano camera resolution and mounting height will be used?
+
+
+8. Immediate Recommended Next Action
+------------------------------------
+
+Do not train a new model yet.
+
+First next action:
+- Validate train13 best.pt safely and record Stage 1 detector metrics.
+
+Second next action:
+- Based on selected top 5 species, build a field-crop classifier dataset from MH-16 boxes.
+
+Third next action:
+- Train the classifier separately and evaluate confusion between species.
+
