@@ -1,0 +1,8 @@
+streamlit
+SpeechRecognition
+pyttsx3
+spotipy
+requests
+mysql-connector-python
+speedtest-cli
+python-dotenv
